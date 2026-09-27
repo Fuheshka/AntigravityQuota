@@ -52,7 +52,83 @@ public enum Localization {
     public static var quitApp: String {
         isRussian ? "Выйти из AntigravityQuota" : "Quit AntigravityQuota"
     }
+    public static var aboutMenuItem: String {
+        isRussian ? "О программе AntigravityQuota..." : "About AntigravityQuota..."
+    }
+    public static var aboutTitle: String {
+        isRussian ? "О программе AntigravityQuota" : "About AntigravityQuota"
+    }
+    public static var aboutAuthor: String {
+        isRussian ? "Автор: Даниил К. (Fuheshka)" : "Created by Daniil K. (Fuheshka)"
+    }
+    public static var aboutSubtitle: String {
+        isRussian ? "Монитор квот и лимитов моделей Google Antigravity в реальном времени" : "Real-time model quota monitor & HUD for Google Antigravity"
+    }
+    public static var aboutVersionLabel: String {
+        isRussian ? "Версия 1.0.0 (macOS 13+)" : "Version 1.0.0 (macOS 13+)"
+    }
+    public static var aboutServerStatusTitle: String {
+        isRussian ? "Статус подключения" : "Connection Status"
+    }
+    public static var aboutServerConnected: String {
+        isRussian ? "Сервер Antigravity обнаружен" : "Antigravity Server Connected"
+    }
+    public static var aboutServerDisconnected: String {
+        isRussian ? "Ожидание запуска Antigravity..." : "Waiting for Antigravity..."
+    }
+    public static var aboutPid: String {
+        isRussian ? "PID процесса" : "Process PID"
+    }
+    public static var aboutPort: String {
+        isRussian ? "Порты API" : "API Ports"
+    }
+    public static var aboutShortcutsTitle: String {
+        isRussian ? "Горячие клавиши" : "Keyboard Shortcuts"
+    }
+    public static var aboutShortcutRefresh: String {
+        isRussian ? "⌘R — Принудительное обновление квот" : "⌘R — Force refresh quotas"
+    }
+    public static var aboutShortcutHUD: String {
+        isRussian ? "⌘H — Показать / скрыть виджет HUD" : "⌘H — Toggle floating HUD"
+    }
+    public static var aboutShortcutCompact: String {
+        isRussian ? "⌘M — Переключить компактный режим" : "⌘M — Toggle compact mode"
+    }
+    public static var aboutShortcutQuit: String {
+        isRussian ? "⌘Q — Выйти из приложения" : "⌘Q — Quit application"
+    }
+    public static var aboutTipsTitle: String {
+        isRussian ? "Полезные возможности" : "Helpful Tips"
+    }
+    public static var aboutTipHUDDrag: String {
+        isRussian ? "Плавающий HUD можно перетаскивать мышью в любое место экрана. Положение автоматически сохраняется." : "Drag the floating HUD anywhere on screen. Position is saved automatically."
+    }
+    public static var aboutTipPillMode: String {
+        isRussian ? "Клик по компактной таблетке разворачивает ее в подробную карточку." : "Click on the compact pill to expand it back into the detailed card."
+    }
+    public static var aboutTipAutoHide: String {
+        isRussian ? "Автоскрытие прячет виджет, когда активно любое другое окно помимо Antigravity." : "Auto-hide conceals the HUD whenever you switch away from Antigravity."
+    }
+    public static var aboutTipAllModels: String {
+        isRussian ? "В меню статус-бара доступен полный расклад по квотам для каждой модели с таймером сброса." : "The status bar menu provides a complete quota breakdown for each model with countdown timers."
+    }
+    public static var aboutGitHubButton: String {
+        isRussian ? "Репозиторий GitHub" : "GitHub Repository"
+    }
+    public static var aboutReleasesButton: String {
+        isRussian ? "Релизы и загрузки" : "Releases & Downloads"
+    }
+    public static var aboutCopyDiagnosticsButton: String {
+        isRussian ? "Скопировать диагностику" : "Copy Diagnostics"
+    }
+    public static var aboutCopiedNotice: String {
+        isRussian ? "Скопировано в буфер обмена!" : "Copied to Clipboard!"
+    }
+    public static var aboutCloseButton: String {
+        isRussian ? "Закрыть" : "Close"
+    }
 }
+
 
 public struct QuotaBucket: Equatable, Sendable {
     public let bucketId: String

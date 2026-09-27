@@ -133,12 +133,21 @@ public final class StatusBarController: NSObject {
 
         menu.addItem(.separator())
 
+        let aboutItem = NSMenuItem(title: Localization.aboutMenuItem, action: #selector(showAboutWindow), keyEquivalent: "")
+        aboutItem.target = self
+        menu.addItem(aboutItem)
+
         let quitItem = NSMenuItem(title: Localization.quitApp, action: #selector(quitApp), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
 
         self.statusItem.menu = menu
     }
+
+    @objc private func showAboutWindow() {
+        AboutWindowController.shared.show(snapshot: latestSnapshot)
+    }
+
 
     private func addGroupSection(to menu: NSMenu, title: String, group: QuotaGroup) {
         let titleItem = NSMenuItem(title: title, action: nil, keyEquivalent: "")

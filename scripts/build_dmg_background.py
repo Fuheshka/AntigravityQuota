@@ -29,13 +29,14 @@ def draw_artwork(width, height, scale=1):
     left_x, right_x = 160 * scale, 500 * scale
     
     # 3. High-Contrast White Label Cards (y=208..242) - sits exactly below 128px icon (bottom at y=204) with zero overlap
-    label_w = 140 * scale
+    label_left_w = 148 * scale
+    label_right_w = 140 * scale
     label_top = 208 * scale
     label_bottom = 242 * scale
     
     # Left pill card (AntigravityQuota.app)
     draw.rounded_rectangle(
-        [left_x - label_w / 2, label_top, left_x + label_w / 2, label_bottom],
+        [left_x - label_left_w / 2, label_top, left_x + label_left_w / 2, label_bottom],
         radius=8 * scale,
         fill=(255, 255, 255, 240),
         outline=(255, 255, 255, 255),
@@ -44,7 +45,7 @@ def draw_artwork(width, height, scale=1):
     
     # Right pill card (Applications)
     draw.rounded_rectangle(
-        [right_x - label_w / 2, label_top, right_x + label_w / 2, label_bottom],
+        [right_x - label_right_w / 2, label_top, right_x + label_right_w / 2, label_bottom],
         radius=8 * scale,
         fill=(255, 255, 255, 240),
         outline=(255, 255, 255, 255),

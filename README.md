@@ -33,6 +33,11 @@ Instead of opening `Settings -> Models` and manually clicking **Refresh**, Antig
 - **macOS Menu Bar Status Item (`StatusBarController`)**:
   - Always-visible summary (`85% · 100%`) in the macOS menu bar with a native SF Symbol gauge icon.
   - Detailed dropdown menu with 5-hour and weekly reset clocks, per-model quota submenu, HUD toggles, and one-click **Launch at Login** (`LaunchAgent`).
+- **Interactive About & Diagnostics Window (`AboutWindowController`)**:
+  - Live connection status, detected `language_server` PID, API listening ports, and real-time quota metrics.
+  - Quick reference for keyboard shortcuts and interaction tips (dragging, pill mode, auto-hide).
+  - One-click diagnostic report copying to clipboard for effortless troubleshooting and bug reports.
+  - Direct links to GitHub repository and latest releases.
 - **Automatic Reconnection**: Seamlessly re-discovers PID, CSRF token, and localhost ports if `Antigravity.app` restarts.
 - **Bilingual UI (EN / RU)**: Automatically adapts all menus, labels, and countdown units to the system language.
 
@@ -85,6 +90,12 @@ swift test
 # Launch application
 open /Applications/AntigravityQuota.app
 ```
+
+---
+
+## Author
+
+Developed by **Daniil K. ([@Fuheshka](https://github.com/Fuheshka))**.
 
 ---
 

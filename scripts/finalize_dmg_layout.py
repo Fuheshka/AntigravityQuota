@@ -53,6 +53,14 @@ def finalize_dmg(dmg_path="dist/AntigravityQuota-v1.0.0-macOS.dmg", vol_name="An
                 set bounds to {{200, 120, 860, 560}}
             end tell
             
+            -- Set explicit positions for app and Applications link
+            try
+                set position of item "{vol_name}.app" to {{160, 140}}
+            end try
+            try
+                set position of item "Applications" to {{500, 140}}
+            end try
+
             -- Position hidden items slightly below window bounds (y=500) so they NEVER cause horizontal rightward scrolling
             try
                 set position of item ".background" to {{330, 500}}
@@ -64,7 +72,7 @@ def finalize_dmg(dmg_path="dist/AntigravityQuota-v1.0.0-macOS.dmg", vol_name="An
             set opts to icon view options of container window
             tell opts
                 set icon size to 128
-                set text size to 13
+                set text size to 12
                 set arrangement to not arranged
                 set label position to bottom
             end tell

@@ -124,4 +124,52 @@ public final class QuotaClient: @unchecked Sendable {
             return nil
         }
     }
+
+    public var currentEndpoint: ServerEndpoint? {
+        cachedEndpoint
+    }
+
+    public static func buildDiagnosticReport(endpoint: ServerEndpoint?, snapshot: QuotaSnapshot?) -> String {
+        var lines: [String] = []
+        lines.append("=== AntigravityQuota Diagnostics ===")
+        lines.append("App: AntigravityQuota v1.0.0")
+        lines.append("macOS: \(ProcessInfo.processInfo.operatingSystemVersionString)")
+        if let ep = endpoint {
+            lines.append("language_server: Connected (PID: \(ep.pid))")
+            lines.append("API Ports: \(ep.ports.map(String.init).joined(separator: ", "))")
+            let maskedToken = ep.csrfToken.isEmpty ? "None" : "\(ep.csrfToken.prefix(8))..."
+            lines.append("CSRF Token: \(maskedToken)")
+        } else {
+            lines.append("language_server: Not running or waiting for Antigravity.app")
+        }
+
+        if let snap = snapshot {
+            lines.append("Last Updated: \(QuotaFormatter.formatClockTime(snap.updatedAt))")
+            if let g = snap.geminiGroup?.fiveHourBucket {
+                let cd = QuotaFormatter.formatCountdown(to: g.resetDate)
+                lines.append(String(format: "Gemini 5h: %.1f%% (Resets in %@)", g.percentage, cd))
+            }
+            if let gw = snap.geminiGroup?.weeklyBucket {
+                let cd = QuotaFormatter.formatCountdown(to: gw.resetDate)
+                lines.append(String(format: "Gemini Weekly: %.1f%% (Resets in %@)", gw.percentage, cd))
+            }
+            if let c = snap.claudeGroup?.fiveHourBucket {
+                let cd = QuotaFormatter.formatCountdown(to: c.resetDate)
+                lines.append(String(format: "Claude 5h: %.1f%% (Resets in %@)", c.percentage, cd))
+            }
+            if let cw = snap.claudeGroup?.weeklyBucket {
+                let cd = QuotaFormatter.formatCountdown(to: cw.resetDate)
+                lines.append(String(format: "Claude Weekly: %.1f%% (Resets in %@)", cw.percentage, cd))
+            }
+            lines.append("Individual Models Count: \(snap.models.count)")
+            for m in snap.models {
+                let cd = QuotaFormatter.formatCountdown(to: m.resetDate)
+                lines.append(String(format: "  • %@: %.1f%% (↻ %@)", m.label, m.percentage, cd))
+            }
+        } else {
+            lines.append("Snapshot: None (Offline / No data received)")
+        }
+        return lines.joined(separator: "\n")
+    }
 }
+

@@ -157,4 +157,25 @@ final class QuotaCoreTests: XCTestCase {
         XCTAssertEqual(compactFrame.maxX, 1708)
         XCTAssertEqual(compactFrame.minY, 32)
     }
+
+    func testQuotaClientDiagnosticReport() {
+        let endpoint = ServerEndpoint(pid: 12345, csrfToken: "sample-token-abc", ports: [50001, 50000])
+        let snap = QuotaSnapshot(
+            groups: [
+                QuotaGroup(
+                    displayName: "Gemini Models",
+                    description: "Gemini",
+                    buckets: [
+                        QuotaBucket(bucketId: "gemini-5h", window: "5h", remainingFraction: 0.8, resetDate: nil)
+                    ]
+                )
+            ],
+            models: []
+        )
+        let report = QuotaClient.buildDiagnosticReport(endpoint: endpoint, snapshot: snap)
+        XCTAssertTrue(report.contains("PID: 12345"))
+        XCTAssertTrue(report.contains("50001"))
+        XCTAssertTrue(report.contains("Gemini 5h: 80.0%"))
+    }
 }
+

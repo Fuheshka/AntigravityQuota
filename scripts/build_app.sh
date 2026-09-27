@@ -47,6 +47,8 @@ cat > "${CONTENTS}/Info.plist" <<EOF
     <string>APPL</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright © 2026 Daniil K. (Fuheshka). All rights reserved.</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>LSUIElement</key>
