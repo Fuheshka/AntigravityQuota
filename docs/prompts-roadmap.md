@@ -34,9 +34,9 @@
 > - Проверь сборку `.app`, запиши решение в `implementation-notes.md` и обнови `/Users/fuheshka/Documents/Obsidian Vault/.agents/MEMORY.md`. Не делай git commit без моего подтверждения.
 > ```
 
-- [ ] **Промпт 1.2: Сборка брендированного установщика .dmg и архива .zip**
+- [x] **Промпт 1.2: Сборка брендированного установщика .dmg и архива .zip**
 
-> [!note]+ Текст промпта 1.2
+> [!note]- Текст промпта 1.2
 > ```text
 > [/goal](slashCommand;goal) [/using-superpowers](slashCommand;using-superpowers) [/vibe-coding](slashCommand;vibe-coding) [/macos-dmg-designer](slashCommand;macos-dmg-designer) [/macos-native-utility](slashCommand;macos-native-utility) [/ponytail](slashCommand;ponytail)
 >
