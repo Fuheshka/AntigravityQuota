@@ -7,6 +7,8 @@ public final class StatusBarController: NSObject {
     private let hudController: QuotaHUDWindowController
     private var pollTimer: Timer?
     private var latestSnapshot: QuotaSnapshot?
+    private let pollScheduler = AdaptivePollScheduler()
+    private var workspaceObservers: [NSObjectProtocol] = []
 
     public init(hudController: QuotaHUDWindowController) {
         self.hudController = hudController
@@ -18,8 +20,15 @@ public final class StatusBarController: NSObject {
             self?.refreshNow()
         }
         rebuildMenu()
+        setupWorkspaceObservers()
         refreshNow()
-        startPolling()
+        updatePollingSchedule(forceReschedule: true)
+    }
+
+    deinit {
+        for obs in workspaceObservers {
+            NSWorkspace.shared.notificationCenter.removeObserver(obs)
+        }
     }
 
     private func configureStatusButton(title: String) {
@@ -40,13 +49,121 @@ public final class StatusBarController: NSObject {
         button.title = " " + title
     }
 
-    private func startPolling() {
+    private func isAntigravityRunning() -> Bool {
+        NSWorkspace.shared.runningApplications.contains { app in
+            AdaptivePollPolicy.isAntigravityApp(
+                bundleIdentifier: app.bundleIdentifier,
+                localizedName: app.localizedName
+            )
+        }
+    }
+
+    private func updatePollingSchedule(forceReschedule: Bool = false) {
+        let isRunning = isAntigravityRunning()
+        let isFrontmost = hudController.isAntigravityFrontmost()
+        let isServerUp = (latestSnapshot != nil) || (QuotaClient.shared.currentEndpoint != nil)
+
+        let updateResult = pollScheduler.update(
+            isAntigravityRunning: isRunning,
+            isAntigravityFrontmost: isFrontmost,
+            isLanguageServerRunning: isServerUp
+        )
+
+        if forceReschedule || pollTimer == nil || updateResult.didChange {
+            scheduleTimer(interval: updateResult.interval)
+        }
+    }
+
+    private func scheduleTimer(interval: TimeInterval) {
         pollTimer?.invalidate()
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 20.0, repeats: true) { [weak self] _ in
+        pollTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.refreshNow()
             }
         }
+    }
+
+    private func setupWorkspaceObservers() {
+        let nc = NSWorkspace.shared.notificationCenter
+
+        // 1. Instant refresh on wake from sleep without waiting for timer tick
+        workspaceObservers.append(
+            nc.addObserver(
+                forName: NSWorkspace.didWakeNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in
+                    self?.handleWakeFromSleep()
+                }
+            }
+        )
+
+        // 2. Frontmost app activated (switch between 20s foreground and 60s background)
+        workspaceObservers.append(
+            nc.addObserver(
+                forName: NSWorkspace.didActivateApplicationNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in
+                    self?.updatePollingSchedule()
+                }
+            }
+        )
+
+        // 3. Application launched (instant switch if Antigravity launched)
+        workspaceObservers.append(
+            nc.addObserver(
+                forName: NSWorkspace.didLaunchApplicationNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                guard let self = self else { return }
+                let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+                if AdaptivePollPolicy.isAntigravityApp(bundleIdentifier: app?.bundleIdentifier, localizedName: app?.localizedName) {
+                    Task { @MainActor in
+                        self.handleAntigravityLaunched()
+                    }
+                }
+            }
+        )
+
+        // 4. Application terminated (instant switch to offline/closed mode if Antigravity terminated)
+        workspaceObservers.append(
+            nc.addObserver(
+                forName: NSWorkspace.didTerminateApplicationNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                guard let self = self else { return }
+                let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+                if AdaptivePollPolicy.isAntigravityApp(bundleIdentifier: app?.bundleIdentifier, localizedName: app?.localizedName) {
+                    Task { @MainActor in
+                        self.handleAntigravityTerminated()
+                    }
+                }
+            }
+        )
+    }
+
+    private func handleWakeFromSleep() {
+        refreshNow()
+        updatePollingSchedule(forceReschedule: true)
+    }
+
+    private func handleAntigravityLaunched() {
+        refreshNow()
+        updatePollingSchedule(forceReschedule: true)
+    }
+
+    private func handleAntigravityTerminated() {
+        self.latestSnapshot = nil
+        self.configureStatusButton(title: "Offline")
+        self.hudController.viewModel.snapshot = nil
+        self.hudController.updateVisibility()
+        self.rebuildMenu()
+        updatePollingSchedule(forceReschedule: true)
     }
 
     @objc public func refreshNow() {
@@ -62,6 +179,7 @@ public final class StatusBarController: NSObject {
                 QuotaNotificationManager.shared.processSnapshot(snap)
             }
             self.rebuildMenu()
+            self.updatePollingSchedule()
         }
     }
 
