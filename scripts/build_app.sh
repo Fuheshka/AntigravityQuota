@@ -65,3 +65,11 @@ rm -rf "/Applications/${APP_BUNDLE}"
 cp -R "${APP_BUNDLE}" "/Applications/${APP_BUNDLE}"
 
 echo "✅ Installed to /Applications/${APP_BUNDLE}"
+
+if pgrep -x "${APP_NAME}" >/dev/null 2>&1; then
+    echo "🔄 Restarting running ${APP_NAME}..."
+    killall "${APP_NAME}" 2>/dev/null || true
+    sleep 0.5
+fi
+open "/Applications/${APP_BUNDLE}"
+echo "🚀 Launched /Applications/${APP_BUNDLE}"

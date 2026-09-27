@@ -16,6 +16,7 @@ public final class AboutWindowController: NSObject, NSWindowDelegate {
     public func show(snapshot: QuotaSnapshot?) {
         viewModel.snapshot = snapshot
         viewModel.endpoint = QuotaClient.shared.currentEndpoint ?? ServerDiscovery.discoverActiveServer()
+        viewModel.isNotificationsEnabled = QuotaNotificationManager.shared.isNotificationsEnabled
 
         if let existing = window {
             existing.center()
@@ -28,7 +29,7 @@ public final class AboutWindowController: NSObject, NSWindowDelegate {
         let hostingView = NSHostingView(rootView: contentView)
 
         let win = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 440, height: 490),
+            contentRect: NSRect(x: 0, y: 0, width: 440, height: 530),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -55,6 +56,11 @@ final class AboutViewModel: ObservableObject {
     @Published var snapshot: QuotaSnapshot?
     @Published var endpoint: ServerEndpoint?
     @Published var copiedFeedback: Bool = false
+    @Published var isNotificationsEnabled: Bool = QuotaNotificationManager.shared.isNotificationsEnabled {
+        didSet {
+            QuotaNotificationManager.shared.isNotificationsEnabled = isNotificationsEnabled
+        }
+    }
 
     func copyDiagnostics() {
         let text = QuotaClient.buildDiagnosticReport(endpoint: endpoint, snapshot: snapshot)
@@ -156,6 +162,7 @@ struct AboutView: View {
             ScrollView(.vertical, showsIndicators: true) {
                 VStack(spacing: 12) {
                     statusSection
+                    settingsSection
                     shortcutsSection
                     tipsSection
                 }
@@ -196,7 +203,7 @@ struct AboutView: View {
             .padding(.horizontal, 18)
             .padding(.bottom, 16)
         }
-        .frame(width: 440, height: 490)
+        .frame(width: 440, height: 530)
     }
 
     private var statusSection: some View {
@@ -243,6 +250,24 @@ struct AboutView: View {
                         .foregroundColor(.secondary)
                 }
             }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.primary.opacity(0.04))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private var settingsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(Localization.notificationsMenuItem)
+                .font(.system(size: 12, weight: .bold))
+
+            Toggle(isOn: $viewModel.isNotificationsEnabled) {
+                Text(Localization.aboutSettingNotifications)
+                    .font(.system(size: 11))
+            }
+            .toggleStyle(.switch)
+            .controlSize(.small)
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)

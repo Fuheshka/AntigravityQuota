@@ -58,6 +58,9 @@ public final class StatusBarController: NSObject {
             self.hudController.viewModel.snapshot = snap
             self.hudController.updateVisibility()
             self.configureStatusButton(title: snap?.menuBarTitle ?? "Offline")
+            if let snap = snap {
+                QuotaNotificationManager.shared.processSnapshot(snap)
+            }
             self.rebuildMenu()
         }
     }
@@ -131,6 +134,11 @@ public final class StatusBarController: NSObject {
         launchAtLoginItem.state = LaunchAgentManager.isEnabled ? .on : .off
         menu.addItem(launchAtLoginItem)
 
+        let toggleNotificationsItem = NSMenuItem(title: Localization.notificationsMenuItem, action: #selector(toggleNotifications), keyEquivalent: "")
+        toggleNotificationsItem.target = self
+        toggleNotificationsItem.state = QuotaNotificationManager.shared.isNotificationsEnabled ? .on : .off
+        menu.addItem(toggleNotificationsItem)
+
         menu.addItem(.separator())
 
         let aboutItem = NSMenuItem(title: Localization.aboutMenuItem, action: #selector(showAboutWindow), keyEquivalent: "")
@@ -189,6 +197,11 @@ public final class StatusBarController: NSObject {
 
     @objc private func toggleLaunchAtLogin() {
         LaunchAgentManager.setEnabled(!LaunchAgentManager.isEnabled)
+        rebuildMenu()
+    }
+
+    @objc private func toggleNotifications() {
+        QuotaNotificationManager.shared.isNotificationsEnabled.toggle()
         rebuildMenu()
     }
 

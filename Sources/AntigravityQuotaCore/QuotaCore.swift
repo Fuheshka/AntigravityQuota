@@ -127,6 +127,29 @@ public enum Localization {
     public static var aboutCloseButton: String {
         isRussian ? "Закрыть" : "Close"
     }
+    public static var notificationsMenuItem: String {
+        isRussian ? "Уведомления о сбросе и лимитах" : "Quota Alerts & Reset Notifications"
+    }
+    public static var aboutSettingNotifications: String {
+        isRussian ? "Уведомления macOS о сбросе и низком остатке (<10%)" : "macOS alerts on quota reset & low remaining (<10%)"
+    }
+
+    public static func notificationsResetTitle(isRussian: Bool = Localization.isRussian) -> String {
+        isRussian ? "Квоты сброшены" : "Quotas Reset"
+    }
+
+    public static func notificationsResetBody(pool: String, isRussian: Bool = Localization.isRussian) -> String {
+        isRussian ? "Пул \(pool) снова доступен на 100%" : "\(pool) pool is back to 100%"
+    }
+
+    public static func notificationsLowTitle(isRussian: Bool = Localization.isRussian) -> String {
+        isRussian ? "Низкий остаток квоты" : "Low Quota Warning"
+    }
+
+    public static func notificationsLowBody(pool: String, percent: Double, isRussian: Bool = Localization.isRussian) -> String {
+        let pctStr = String(format: "%.0f%%", percent)
+        return isRussian ? "\(pool): осталось \(pctStr)" : "\(pool): \(pctStr) remaining"
+    }
 }
 
 
@@ -159,6 +182,16 @@ public struct QuotaGroup: Equatable, Sendable {
 
     public var weeklyBucket: QuotaBucket? {
         buckets.first { $0.window == "weekly" || $0.bucketId.hasSuffix("-weekly") }
+    }
+
+    public var shortPoolName: String {
+        if displayName.localizedCaseInsensitiveContains("gemini") {
+            return "Gemini"
+        }
+        if displayName.localizedCaseInsensitiveContains("claude") || displayName.localizedCaseInsensitiveContains("gpt") {
+            return "Claude"
+        }
+        return displayName
     }
 
     public init(displayName: String, description: String, buckets: [QuotaBucket]) {
@@ -403,5 +436,110 @@ public enum QuotaFormatter {
         x = max(screenBounds.minX + 8, min(x, screenBounds.maxX - newSize.width - 8))
         y = max(screenBounds.minY + 8, min(y, screenBounds.maxY - newSize.height - 8))
         return CGRect(x: x, y: y, width: newSize.width, height: newSize.height)
+    }
+}
+
+public enum QuotaNotificationEvent: Equatable, Sendable {
+    case reset(poolName: String)
+    case lowQuota(poolName: String, remainingPercentage: Double)
+
+    public var title: String {
+        switch self {
+        case .reset:
+            return Localization.notificationsResetTitle()
+        case .lowQuota:
+            return Localization.notificationsLowTitle()
+        }
+    }
+
+    public var body: String {
+        switch self {
+        case .reset(let pool):
+            return Localization.notificationsResetBody(pool: pool)
+        case .lowQuota(let pool, let pct):
+            return Localization.notificationsLowBody(pool: pool, percent: pct)
+        }
+    }
+}
+
+public final class QuotaNotificationEvaluator {
+    private struct PoolState {
+        var wasBelow100: Bool
+        var lastAlertedThreshold: Double
+    }
+
+    private var poolStates: [String: PoolState] = [:]
+    private var isFirstEvaluation: Bool = true
+
+    public init() {}
+
+    public func evaluate(snapshot: QuotaSnapshot) -> [QuotaNotificationEvent] {
+        var events: [QuotaNotificationEvent] = []
+
+        let pools: [(id: String, name: String, percentage: Double)]
+        if !snapshot.groups.isEmpty {
+            pools = snapshot.groups.compactMap { g in
+                guard let bucket = g.fiveHourBucket else { return nil }
+                return (id: bucket.bucketId, name: g.shortPoolName, percentage: bucket.percentage)
+            }
+        } else {
+            pools = snapshot.models.map { m in
+                (id: m.label, name: m.label, percentage: m.percentage)
+            }
+        }
+
+        if isFirstEvaluation {
+            isFirstEvaluation = false
+            for p in pools {
+                let below100 = p.percentage < 99.99
+                let threshold: Double
+                if p.percentage <= 5.0 {
+                    threshold = 5.0
+                } else if p.percentage <= 10.0 {
+                    threshold = 10.0
+                } else {
+                    threshold = 100.0
+                }
+                poolStates[p.id] = PoolState(wasBelow100: below100, lastAlertedThreshold: threshold)
+            }
+            return []
+        }
+
+        for p in pools {
+            var state = poolStates[p.id] ?? PoolState(wasBelow100: p.percentage < 99.99, lastAlertedThreshold: 100.0)
+
+            if p.percentage >= 99.99 {
+                if state.wasBelow100 {
+                    events.append(.reset(poolName: p.name))
+                    state.wasBelow100 = false
+                }
+                state.lastAlertedThreshold = 100.0
+            } else {
+                state.wasBelow100 = true
+
+                if p.percentage <= 5.0 {
+                    if state.lastAlertedThreshold > 5.0 {
+                        events.append(.lowQuota(poolName: p.name, remainingPercentage: p.percentage))
+                        state.lastAlertedThreshold = 5.0
+                    }
+                } else if p.percentage <= 10.0 {
+                    if state.lastAlertedThreshold > 10.0 {
+                        events.append(.lowQuota(poolName: p.name, remainingPercentage: p.percentage))
+                        state.lastAlertedThreshold = 10.0
+                    }
+                } else if p.percentage > 15.0 {
+                    state.lastAlertedThreshold = 100.0
+                }
+            }
+
+            poolStates[p.id] = state
+        }
+
+        return events
+    }
+
+    public func resetState() {
+        poolStates.removeAll()
+        isFirstEvaluation = true
     }
 }
