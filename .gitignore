@@ -7,3 +7,6 @@ DerivedData/
 *.app
 *.dmg
 *.zip
+dist/
+docs/
+implementation-notes.md
