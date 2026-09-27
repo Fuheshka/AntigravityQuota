@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+echo "🔨 Building AntigravityQuota (Release)..."
+swift build -c release
+
+APP_NAME="AntigravityQuota"
+APP_BUNDLE="${APP_NAME}.app"
+CONTENTS="${APP_BUNDLE}/Contents"
+MACOS="${CONTENTS}/MacOS"
+RESOURCES="${CONTENTS}/Resources"
+
+rm -rf "${APP_BUNDLE}"
+mkdir -p "${MACOS}" "${RESOURCES}"
+
+cp ".build/release/${APP_NAME}" "${MACOS}/${APP_NAME}"
+chmod +x "${MACOS}/${APP_NAME}"
+
+if [ -f "/Applications/Antigravity.app/Contents/Resources/icon.icns" ]; then
+    cp "/Applications/Antigravity.app/Contents/Resources/icon.icns" "${RESOURCES}/AppIcon.icns"
+fi
+
+cat > "${CONTENTS}/Info.plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>${APP_NAME}</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.fuheshka.antigravity-quota</string>
+    <key>CFBundleName</key>
+    <string>${APP_NAME}</string>
+    <key>CFBundleDisplayName</key>
+    <string>Antigravity Quota</string>
+    <key>CFBundleVersion</key>
+    <string>1.0.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+</dict>
+</plist>
+EOF
+
+codesign --force --deep --sign - "${APP_BUNDLE}" >/dev/null 2>&1 || true
+
+rm -rf "/Applications/${APP_BUNDLE}"
+cp -R "${APP_BUNDLE}" "/Applications/${APP_BUNDLE}"
+
+echo "✅ Installed to /Applications/${APP_BUNDLE}"
