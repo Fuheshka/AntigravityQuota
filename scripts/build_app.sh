@@ -18,8 +18,12 @@ mkdir -p "${MACOS}" "${RESOURCES}"
 cp ".build/release/${APP_NAME}" "${MACOS}/${APP_NAME}"
 chmod +x "${MACOS}/${APP_NAME}"
 
-if [ -f "/Applications/Antigravity.app/Contents/Resources/icon.icns" ]; then
-    cp "/Applications/Antigravity.app/Contents/Resources/icon.icns" "${RESOURCES}/AppIcon.icns"
+if [ ! -f "Resources/AppIcon.icns" ] && [ -x "scripts/generate_icns.sh" ]; then
+    ./scripts/generate_icns.sh
+fi
+
+if [ -f "Resources/AppIcon.icns" ]; then
+    cp "Resources/AppIcon.icns" "${RESOURCES}/AppIcon.icns"
 fi
 
 cat > "${CONTENTS}/Info.plist" <<EOF
