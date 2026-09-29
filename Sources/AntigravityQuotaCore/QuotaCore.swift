@@ -58,6 +58,27 @@ public enum Localization {
     public static var launchAtLogin: String {
         isRussian ? "Запускать при входе в систему" : "Launch at Login"
     }
+    public static var showTrendInMenuBar: String {
+        isRussian ? "Показывать динамику расхода в строке меню" : "Show Trend Indicators in Menu Bar"
+    }
+    public static var globalHotkeysTitle: String {
+        isRussian ? "Глобальные горячие клавиши" : "Global Hotkeys"
+    }
+    public static var globalHotkeysSetting: String {
+        isRussian ? "Включить глобальные горячие клавиши" : "Enable Global Hotkeys"
+    }
+    public static var globalHotkeysMenuItem: String {
+        isRussian ? "Глобальные горячие клавиши (⌥⇧Q, ⌥⇧M, ⌥⇧R)" : "Global Hotkeys (⌥⇧Q, ⌥⇧M, ⌥⇧R)"
+    }
+    public static var globalHotkeyToggleHUD: String {
+        isRussian ? "⌥⇧Q — Показать / скрыть виджет HUD" : "⌥⇧Q — Toggle HUD visibility"
+    }
+    public static var globalHotkeyTogglePill: String {
+        isRussian ? "⌥⇧M — Переключить режим таблетки / карточки" : "⌥⇧M — Toggle Pill / Card Mode"
+    }
+    public static var globalHotkeyRefresh: String {
+        isRussian ? "⌥⇧R — Принудительно обновить квоты" : "⌥⇧R — Force refresh quotas"
+    }
     public static var allModelsSubmenu: String {
         isRussian ? "Все модели подробно" : "All Models Breakdown"
     }
@@ -263,6 +284,28 @@ public struct QuotaSnapshot: Equatable, Sendable {
         let cModel = models.first { $0.label.localizedCaseInsensitiveContains("claude") }?.percentage
         if let g = gModel, let c = cModel {
             return String(format: "%.0f%% · %.0f%%", g.rounded(), c.rounded())
+        }
+        return "—%"
+    }
+
+    public func menuBarTitle(
+        geminiTrend: QuotaTrend? = nil,
+        claudeTrend: QuotaTrend? = nil,
+        showTrend: Bool = false
+    ) -> String {
+        guard showTrend else { return menuBarTitle }
+
+        let gTrendStr = geminiTrend != nil ? "\(geminiTrend!.rawValue)" : ""
+        let cTrendStr = claudeTrend != nil ? "\(claudeTrend!.rawValue)" : ""
+
+        if let g = geminiGroup?.fiveHourBucket?.percentage,
+           let c = claudeGroup?.fiveHourBucket?.percentage {
+            return String(format: "%.0f%%%@ · %.0f%%%@", g.rounded(), gTrendStr, c.rounded(), cTrendStr)
+        }
+        let gModel = models.first { $0.label.localizedCaseInsensitiveContains("gemini") }?.percentage
+        let cModel = models.first { $0.label.localizedCaseInsensitiveContains("claude") }?.percentage
+        if let g = gModel, let c = cModel {
+            return String(format: "%.0f%%%@ · %.0f%%%@", g.rounded(), gTrendStr, c.rounded(), cTrendStr)
         }
         return "—%"
     }
@@ -592,3 +635,75 @@ public final class QuotaNotificationEvaluator {
         isFirstEvaluation = true
     }
 }
+
+// MARK: - Global Hotkeys
+
+public enum GlobalHotkeyAction: UInt32, CaseIterable, Sendable {
+    case toggleHUD = 1
+    case togglePillMode = 2
+    case refreshQuotas = 3
+
+    public var id: UInt32 { rawValue }
+
+    public var keyChar: String {
+        switch self {
+        case .toggleHUD: return "Q"
+        case .togglePillMode: return "M"
+        case .refreshQuotas: return "R"
+        }
+    }
+
+    /// Virtual key code corresponding to Carbon kVK_ANSI_* constants:
+    /// kVK_ANSI_Q = 12 (0x0C), kVK_ANSI_M = 46 (0x2E), kVK_ANSI_R = 15 (0x0F)
+    public var keyCode: UInt32 {
+        switch self {
+        case .toggleHUD: return 12
+        case .togglePillMode: return 46
+        case .refreshQuotas: return 15
+        }
+    }
+
+    /// Carbon modifier flags: (optionKey = 2048 | shiftKey = 512) = 2560
+    public var carbonModifiers: UInt32 {
+        return 2560
+    }
+
+    public var symbolicShortcut: String {
+        switch self {
+        case .toggleHUD: return "⌥⇧Q"
+        case .togglePillMode: return "⌥⇧M"
+        case .refreshQuotas: return "⌥⇧R"
+        }
+    }
+
+    public var localizedName: String {
+        switch self {
+        case .toggleHUD:
+            return Localization.isRussian ? "Показать / скрыть виджет HUD" : "Toggle HUD visibility"
+        case .togglePillMode:
+            return Localization.isRussian ? "Переключить режим таблетки (Pill Mode)" : "Toggle Pill / Card Mode"
+        case .refreshQuotas:
+            return Localization.isRussian ? "Принудительно обновить квоты" : "Force refresh quotas"
+        }
+    }
+}
+
+public struct GlobalHotkeyCore: Sendable {
+    /// 4-character code 'AGQT' (0x41475154)
+    public static let signature: UInt32 = 0x41475154
+
+    public static func action(for id: UInt32) -> GlobalHotkeyAction? {
+        GlobalHotkeyAction(rawValue: id)
+    }
+
+    public static func action(forKeyCode keyCode: UInt32, modifiers: UInt32) -> GlobalHotkeyAction? {
+        guard modifiers == 2560 else { return nil }
+        return GlobalHotkeyAction.allCases.first { $0.keyCode == keyCode }
+    }
+
+    public static func matches(signature sig: UInt32, id: UInt32) -> GlobalHotkeyAction? {
+        guard sig == signature else { return nil }
+        return GlobalHotkeyAction(rawValue: id)
+    }
+}
+

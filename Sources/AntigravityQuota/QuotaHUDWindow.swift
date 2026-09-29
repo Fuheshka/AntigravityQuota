@@ -4,7 +4,15 @@ import AntigravityQuotaCore
 
 @MainActor
 public final class QuotaViewModel: ObservableObject {
-    @Published public var snapshot: QuotaSnapshot?
+    @Published public var snapshot: QuotaSnapshot? {
+        didSet { onLayoutChange?() }
+    }
+    @Published public var geminiBurnRate: QuotaBurnRate? {
+        didSet { onLayoutChange?() }
+    }
+    @Published public var claudeBurnRate: QuotaBurnRate? {
+        didSet { onLayoutChange?() }
+    }
     @Published public var isRefreshing: Bool = false
     @Published public var isCompact: Bool {
         didSet {
@@ -70,16 +78,30 @@ struct QuotaHUDView: View {
         )
     }
 
+    private func trendColor(for trend: QuotaTrend) -> Color {
+        switch trend {
+        case .burning:
+            return Color(red: 0.96, green: 0.65, blue: 0.14) // Amber
+        case .recovering:
+            return Color(red: 0.20, green: 0.83, blue: 0.60) // Emerald
+        case .stable:
+            return Color.white.opacity(0.5)
+        }
+    }
+
     private var compactPillView: some View {
         let g5h = viewModel.snapshot?.geminiGroup?.fiveHourBucket
         let c5h = viewModel.snapshot?.claudeGroup?.fiveHourBucket
+
+        let gTrend = viewModel.geminiBurnRate?.trend.rawValue ?? ""
+        let cTrend = viewModel.claudeBurnRate?.trend.rawValue ?? ""
 
         return HStack(spacing: 8) {
             Circle()
                 .fill(barColor(for: g5h?.percentage ?? 100))
                 .frame(width: 7, height: 7)
 
-            Text(String(format: "G %.1f%%", g5h?.percentage ?? 0))
+            Text(String(format: "G %.0f%%%@", g5h?.percentage ?? 0, gTrend))
                 .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
                 .foregroundColor(.white)
 
@@ -96,7 +118,7 @@ struct QuotaHUDView: View {
                 .fill(barColor(for: c5h?.percentage ?? 100))
                 .frame(width: 7, height: 7)
 
-            Text(String(format: "C %.0f%%", c5h?.percentage ?? 0))
+            Text(String(format: "C %.0f%%%@", c5h?.percentage ?? 0, cTrend))
                 .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
                 .foregroundColor(.white)
 
@@ -155,14 +177,16 @@ struct QuotaHUDView: View {
                     poolRow(
                         title: "Gemini",
                         fiveHour: gemini.fiveHourBucket,
-                        weekly: gemini.weeklyBucket
+                        weekly: gemini.weeklyBucket,
+                        burnRate: viewModel.geminiBurnRate
                     )
                 }
                 if let claude = snap.claudeGroup {
                     poolRow(
                         title: "Claude / GPT",
                         fiveHour: claude.fiveHourBucket,
-                        weekly: claude.weeklyBucket
+                        weekly: claude.weeklyBucket,
+                        burnRate: viewModel.claudeBurnRate
                     )
                 }
             } else {
@@ -174,10 +198,15 @@ struct QuotaHUDView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .frame(width: 248)
+        .frame(width: 256)
     }
 
-    private func poolRow(title: String, fiveHour: QuotaBucket?, weekly: QuotaBucket?) -> some View {
+    private func poolRow(
+        title: String,
+        fiveHour: QuotaBucket?,
+        weekly: QuotaBucket?,
+        burnRate: QuotaBurnRate?
+    ) -> some View {
         let pct5h = fiveHour?.percentage ?? 0
         let pctWeekly = weekly?.percentage ?? 0
 
@@ -212,6 +241,18 @@ struct QuotaHUDView: View {
                 }
             }
             .frame(height: 5)
+
+            if let burn = burnRate {
+                HStack(spacing: 3) {
+                    Text(burn.trend.rawValue)
+                        .font(.system(size: 9.5, weight: .bold))
+                        .foregroundColor(trendColor(for: burn.trend))
+                    Text(burn.formatted(isRussian: Localization.isRussian))
+                        .font(.system(size: 9.5, weight: .medium, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.72))
+                    Spacer()
+                }
+            }
 
             if weekly != nil {
                 HStack {

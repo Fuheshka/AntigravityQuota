@@ -10,6 +10,18 @@ public final class StatusBarController: NSObject {
     private let pollScheduler = AdaptivePollScheduler()
     private var workspaceObservers: [NSObjectProtocol] = []
 
+    private var isTrendInMenuBarEnabled: Bool {
+        get {
+            if UserDefaults.standard.object(forKey: "ShowTrendInMenuBar") == nil {
+                return true
+            }
+            return UserDefaults.standard.bool(forKey: "ShowTrendInMenuBar")
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "ShowTrendInMenuBar")
+        }
+    }
+
     public init(hudController: QuotaHUDWindowController) {
         self.hudController = hudController
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -19,6 +31,7 @@ public final class StatusBarController: NSObject {
         hudController.viewModel.onRefreshRequested = { [weak self] in
             self?.refreshNow()
         }
+        setupGlobalHotkeys()
         rebuildMenu()
         setupWorkspaceObservers()
         refreshNow()
@@ -161,9 +174,26 @@ public final class StatusBarController: NSObject {
         self.latestSnapshot = nil
         self.configureStatusButton(title: "Offline")
         self.hudController.viewModel.snapshot = nil
+        self.hudController.viewModel.geminiBurnRate = nil
+        self.hudController.viewModel.claudeBurnRate = nil
         self.hudController.updateVisibility()
         self.rebuildMenu()
         updatePollingSchedule(forceReschedule: true)
+    }
+
+    private func updateStatusButtonTitle() {
+        guard let snap = latestSnapshot else {
+            configureStatusButton(title: "Offline")
+            return
+        }
+        let gBurn = QuotaHistoryTracker.shared.burnRate(for: .gemini)
+        let cBurn = QuotaHistoryTracker.shared.burnRate(for: .claude)
+        let title = snap.menuBarTitle(
+            geminiTrend: gBurn.trend,
+            claudeTrend: cBurn.trend,
+            showTrend: isTrendInMenuBarEnabled
+        )
+        configureStatusButton(title: title)
     }
 
     @objc public func refreshNow() {
@@ -174,10 +204,16 @@ public final class StatusBarController: NSObject {
             self.latestSnapshot = snap
             self.hudController.viewModel.snapshot = snap
             self.hudController.updateVisibility()
-            self.configureStatusButton(title: snap?.menuBarTitle ?? "Offline")
             if let snap = snap {
+                QuotaHistoryTracker.shared.record(snapshot: snap)
                 QuotaNotificationManager.shared.processSnapshot(snap)
             }
+            let gBurn = QuotaHistoryTracker.shared.burnRate(for: .gemini)
+            let cBurn = QuotaHistoryTracker.shared.burnRate(for: .claude)
+            self.hudController.viewModel.geminiBurnRate = gBurn
+            self.hudController.viewModel.claudeBurnRate = cBurn
+
+            self.updateStatusButtonTitle()
             self.rebuildMenu()
             self.updatePollingSchedule()
         }
@@ -227,17 +263,20 @@ public final class StatusBarController: NSObject {
         }
 
         let refreshItem = NSMenuItem(title: Localization.refreshNow, action: #selector(refreshNow), keyEquivalent: "r")
+        refreshItem.keyEquivalentModifierMask = [.option, .shift]
         refreshItem.target = self
         menu.addItem(refreshItem)
 
         menu.addItem(.separator())
 
-        let toggleHUDItem = NSMenuItem(title: Localization.showHUD, action: #selector(toggleHUD), keyEquivalent: "h")
+        let toggleHUDItem = NSMenuItem(title: Localization.showHUD, action: #selector(toggleHUD), keyEquivalent: "q")
+        toggleHUDItem.keyEquivalentModifierMask = [.option, .shift]
         toggleHUDItem.target = self
         toggleHUDItem.state = hudController.isHUDEnabled ? .on : .off
         menu.addItem(toggleHUDItem)
 
         let toggleCompactItem = NSMenuItem(title: Localization.compactHUDMode, action: #selector(toggleCompactHUD), keyEquivalent: "m")
+        toggleCompactItem.keyEquivalentModifierMask = [.option, .shift]
         toggleCompactItem.target = self
         toggleCompactItem.state = hudController.viewModel.isCompact ? .on : .off
         menu.addItem(toggleCompactItem)
@@ -289,6 +328,16 @@ public final class StatusBarController: NSObject {
         toggleNotificationsItem.state = QuotaNotificationManager.shared.isNotificationsEnabled ? .on : .off
         menu.addItem(toggleNotificationsItem)
 
+        let toggleTrendItem = NSMenuItem(title: Localization.showTrendInMenuBar, action: #selector(toggleShowTrendInMenuBar), keyEquivalent: "")
+        toggleTrendItem.target = self
+        toggleTrendItem.state = isTrendInMenuBarEnabled ? .on : .off
+        menu.addItem(toggleTrendItem)
+
+        let toggleGlobalHotkeysItem = NSMenuItem(title: Localization.globalHotkeysMenuItem, action: #selector(toggleGlobalHotkeys), keyEquivalent: "")
+        toggleGlobalHotkeysItem.target = self
+        toggleGlobalHotkeysItem.state = GlobalHotkeyManager.shared.isEnabled ? .on : .off
+        menu.addItem(toggleGlobalHotkeysItem)
+
         menu.addItem(.separator())
 
         let aboutItem = NSMenuItem(title: Localization.aboutMenuItem, action: #selector(showAboutWindow), keyEquivalent: "")
@@ -306,7 +355,6 @@ public final class StatusBarController: NSObject {
         AboutWindowController.shared.show(snapshot: latestSnapshot)
     }
 
-
     private func addGroupSection(to menu: NSMenu, title: String, group: QuotaGroup) {
         let titleItem = NSMenuItem(title: title, action: nil, keyEquivalent: "")
         titleItem.isEnabled = false
@@ -320,6 +368,14 @@ public final class StatusBarController: NSObject {
             item.isEnabled = false
             menu.addItem(item)
         }
+
+        let pool: QuotaPool = group.displayName.localizedCaseInsensitiveContains("gemini") ? .gemini : .claude
+        let burn = QuotaHistoryTracker.shared.burnRate(for: pool)
+        let burnStr = burn.formatted(isRussian: Localization.isRussian)
+        let burnLine = String(format: "  • %@: %@ %@", Localization.isRussian ? "Динамика" : "Trend", burn.trend.rawValue, burnStr)
+        let burnItem = NSMenuItem(title: burnLine, action: nil, keyEquivalent: "")
+        burnItem.isEnabled = false
+        menu.addItem(burnItem)
 
         if let bw = group.weeklyBucket {
             let cd = QuotaFormatter.formatCountdown(to: bw.resetDate)
@@ -372,6 +428,32 @@ public final class StatusBarController: NSObject {
 
     @objc private func toggleNotifications() {
         QuotaNotificationManager.shared.isNotificationsEnabled.toggle()
+        rebuildMenu()
+    }
+
+    @objc private func toggleShowTrendInMenuBar() {
+        isTrendInMenuBarEnabled.toggle()
+        updateStatusButtonTitle()
+        rebuildMenu()
+    }
+
+    private func setupGlobalHotkeys() {
+        GlobalHotkeyManager.shared.onToggleHUD = { [weak self] in
+            self?.toggleHUD()
+        }
+        GlobalHotkeyManager.shared.onTogglePillMode = { [weak self] in
+            self?.toggleCompactHUD()
+        }
+        GlobalHotkeyManager.shared.onRefreshQuotas = { [weak self] in
+            self?.refreshNow()
+        }
+        if GlobalHotkeyManager.shared.isEnabled {
+            GlobalHotkeyManager.shared.registerHotkeys()
+        }
+    }
+
+    @objc private func toggleGlobalHotkeys() {
+        GlobalHotkeyManager.shared.isEnabled.toggle()
         rebuildMenu()
     }
 

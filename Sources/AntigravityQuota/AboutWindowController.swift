@@ -17,6 +17,9 @@ public final class AboutWindowController: NSObject, NSWindowDelegate {
         viewModel.snapshot = snapshot
         viewModel.endpoint = QuotaClient.shared.currentEndpoint ?? ServerDiscovery.discoverActiveServer()
         viewModel.isNotificationsEnabled = QuotaNotificationManager.shared.isNotificationsEnabled
+        viewModel.isGlobalHotkeysEnabled = GlobalHotkeyManager.shared.isEnabled
+        viewModel.geminiBurnRate = QuotaHistoryTracker.shared.burnRate(for: .gemini)
+        viewModel.claudeBurnRate = QuotaHistoryTracker.shared.burnRate(for: .claude)
 
         if let existing = window {
             existing.center()
@@ -55,10 +58,17 @@ public final class AboutWindowController: NSObject, NSWindowDelegate {
 final class AboutViewModel: ObservableObject {
     @Published var snapshot: QuotaSnapshot?
     @Published var endpoint: ServerEndpoint?
+    @Published var geminiBurnRate: QuotaBurnRate?
+    @Published var claudeBurnRate: QuotaBurnRate?
     @Published var copiedFeedback: Bool = false
     @Published var isNotificationsEnabled: Bool = QuotaNotificationManager.shared.isNotificationsEnabled {
         didSet {
             QuotaNotificationManager.shared.isNotificationsEnabled = isNotificationsEnabled
+        }
+    }
+    @Published var isGlobalHotkeysEnabled: Bool = GlobalHotkeyManager.shared.isEnabled {
+        didSet {
+            GlobalHotkeyManager.shared.isEnabled = isGlobalHotkeysEnabled
         }
     }
 
@@ -229,18 +239,44 @@ struct AboutView: View {
                         .foregroundColor(.secondary)
 
                     if let snap = viewModel.snapshot {
-                        HStack(spacing: 14) {
+                        VStack(alignment: .leading, spacing: 5) {
                             if let g = snap.geminiGroup?.fiveHourBucket {
                                 let cd = QuotaFormatter.formatCountdown(to: g.resetDate)
-                                Text("Gemini: \(String(format: "%.0f%%", g.percentage)) (\(cd))")
-                                    .font(.system(size: 11, weight: .medium, design: .monospaced))
-                                    .foregroundColor(.green)
+                                let burn = viewModel.geminiBurnRate
+                                let burnStr = burn?.formatted(isRussian: Localization.isRussian) ?? "~0%/ч"
+                                let trend = burn?.trend.rawValue ?? "→"
+                                HStack(spacing: 6) {
+                                    Text("Gemini:")
+                                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                        .foregroundColor(.green)
+                                    Text("\(String(format: "%.0f%%", g.percentage)) (\(cd))")
+                                        .font(.system(size: 11, design: .monospaced))
+                                        .foregroundColor(.primary.opacity(0.85))
+                                    Text("•")
+                                        .foregroundColor(.secondary)
+                                    Text("\(trend) \(burnStr)")
+                                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                                        .foregroundColor(.secondary)
+                                }
                             }
                             if let c = snap.claudeGroup?.fiveHourBucket {
                                 let cd = QuotaFormatter.formatCountdown(to: c.resetDate)
-                                Text("Claude: \(String(format: "%.0f%%", c.percentage)) (\(cd))")
-                                    .font(.system(size: 11, weight: .medium, design: .monospaced))
-                                    .foregroundColor(.cyan)
+                                let burn = viewModel.claudeBurnRate
+                                let burnStr = burn?.formatted(isRussian: Localization.isRussian) ?? "~0%/ч"
+                                let trend = burn?.trend.rawValue ?? "→"
+                                HStack(spacing: 6) {
+                                    Text("Claude:")
+                                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                        .foregroundColor(.cyan)
+                                    Text("\(String(format: "%.0f%%", c.percentage)) (\(cd))")
+                                        .font(.system(size: 11, design: .monospaced))
+                                        .foregroundColor(.primary.opacity(0.85))
+                                    Text("•")
+                                        .foregroundColor(.secondary)
+                                    Text("\(trend) \(burnStr)")
+                                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                                        .foregroundColor(.secondary)
+                                }
                             }
                         }
                     }
@@ -268,6 +304,18 @@ struct AboutView: View {
             }
             .toggleStyle(.switch)
             .controlSize(.small)
+
+            Divider()
+
+            Text(Localization.globalHotkeysTitle)
+                .font(.system(size: 12, weight: .bold))
+
+            Toggle(isOn: $viewModel.isGlobalHotkeysEnabled) {
+                Text(Localization.globalHotkeysSetting)
+                    .font(.system(size: 11))
+            }
+            .toggleStyle(.switch)
+            .controlSize(.small)
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -277,12 +325,19 @@ struct AboutView: View {
 
     private var shortcutsSection: some View {
         VStack(alignment: .leading, spacing: 6) {
+            Text(Localization.globalHotkeysTitle)
+                .font(.system(size: 12, weight: .bold))
+
+            shortcutRow(key: "⌥ ⇧ Q", desc: Localization.globalHotkeyToggleHUD)
+            shortcutRow(key: "⌥ ⇧ M", desc: Localization.globalHotkeyTogglePill)
+            shortcutRow(key: "⌥ ⇧ R", desc: Localization.globalHotkeyRefresh)
+
+            Divider()
+                .padding(.vertical, 2)
+
             Text(Localization.aboutShortcutsTitle)
                 .font(.system(size: 12, weight: .bold))
 
-            shortcutRow(key: "⌘ R", desc: Localization.aboutShortcutRefresh)
-            shortcutRow(key: "⌘ H", desc: Localization.aboutShortcutHUD)
-            shortcutRow(key: "⌘ M", desc: Localization.aboutShortcutCompact)
             shortcutRow(key: "⌘ Q", desc: Localization.aboutShortcutQuit)
         }
         .padding(10)

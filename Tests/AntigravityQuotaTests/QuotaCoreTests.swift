@@ -229,6 +229,30 @@ final class QuotaCoreTests: XCTestCase {
         XCTAssertFalse(Localization.opacity75.isEmpty)
         XCTAssertFalse(Localization.opacity50.isEmpty)
         XCTAssertFalse(Localization.aboutTipClickThrough.isEmpty)
+        XCTAssertFalse(Localization.showTrendInMenuBar.isEmpty)
+    }
+
+    func testMenuBarTitleWithTrends() {
+        let bG = QuotaBucket(bucketId: "gemini-5h", window: "5h", remainingFraction: 0.854, resetDate: nil)
+        let bC = QuotaBucket(bucketId: "claude-5h", window: "5h", remainingFraction: 1.0, resetDate: nil)
+        let snap = QuotaSnapshot(
+            groups: [
+                QuotaGroup(displayName: "Gemini Models", description: "", buckets: [bG]),
+                QuotaGroup(displayName: "Claude & GPT", description: "", buckets: [bC])
+            ],
+            models: []
+        )
+
+        // Without trend indicators
+        XCTAssertEqual(snap.menuBarTitle(showTrend: false), "85% · 100%")
+        XCTAssertEqual(snap.menuBarTitle, "85% · 100%")
+
+        // With trend indicators
+        let titleWithTrends = snap.menuBarTitle(geminiTrend: .burning, claudeTrend: .stable, showTrend: true)
+        XCTAssertEqual(titleWithTrends, "85%↓ · 100%→")
+
+        let titleRecovering = snap.menuBarTitle(geminiTrend: .recovering, claudeTrend: .burning, showTrend: true)
+        XCTAssertEqual(titleRecovering, "85%↑ · 100%↓")
     }
 }
 
