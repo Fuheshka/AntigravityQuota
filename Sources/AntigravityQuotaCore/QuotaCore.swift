@@ -37,6 +37,24 @@ public enum Localization {
     public static var compactHUDMode: String {
         isRussian ? "Компактный режим HUD (таблетка)" : "Compact HUD Mode (Pill)"
     }
+    public static var hudSettingsSubmenu: String {
+        isRussian ? "Настройки HUD" : "HUD Settings"
+    }
+    public static var clickThroughMenuItem: String {
+        isRussian ? "Сквозной клик мыши (⌥ Option для захвата)" : "Click-Through Mode (⌥ Option to interact)"
+    }
+    public static var hudOpacityTitle: String {
+        isRussian ? "Прозрачность матового стекла" : "Frosted Glass Opacity"
+    }
+    public static var opacity100: String {
+        isRussian ? "100% (Непрозрачный)" : "100% (Opaque)"
+    }
+    public static var opacity75: String {
+        isRussian ? "75% (Полупрозрачный)" : "75% (Translucent)"
+    }
+    public static var opacity50: String {
+        isRussian ? "50% (Высокая прозрачность)" : "50% (High Translucency)"
+    }
     public static var launchAtLogin: String {
         isRussian ? "Запускать при входе в систему" : "Launch at Login"
     }
@@ -111,6 +129,9 @@ public enum Localization {
     }
     public static var aboutTipAllModels: String {
         isRussian ? "В меню статус-бара доступен полный расклад по квотам для каждой модели с таймером сброса." : "The status bar menu provides a complete quota breakdown for each model with countdown timers."
+    }
+    public static var aboutTipClickThrough: String {
+        isRussian ? "В режиме сквозного клика виджет пропускает клики в редактор. Зажмите ⌥ Option для взаимодействия или перемещения окна." : "In Click-Through mode, the HUD passes mouse clicks through. Hold ⌥ Option to interact or drag."
     }
     public static var aboutGitHubButton: String {
         isRussian ? "Репозиторий GitHub" : "GitHub Repository"
@@ -436,6 +457,34 @@ public enum QuotaFormatter {
         x = max(screenBounds.minX + 8, min(x, screenBounds.maxX - newSize.width - 8))
         y = max(screenBounds.minY + 8, min(y, screenBounds.maxY - newSize.height - 8))
         return CGRect(x: x, y: y, width: newSize.width, height: newSize.height)
+    }
+
+    public static func snapOriginToScreenEdges(
+        origin: CGPoint,
+        size: CGSize,
+        screenBounds: CGRect,
+        threshold: CGFloat = 16.0
+    ) -> CGPoint {
+        var newX = origin.x
+        var newY = origin.y
+
+        // Left edge
+        if abs(origin.x - screenBounds.minX) < threshold {
+            newX = screenBounds.minX
+        } else if abs((origin.x + size.width) - screenBounds.maxX) < threshold {
+            // Right edge
+            newX = screenBounds.maxX - size.width
+        }
+
+        // Bottom edge
+        if abs(origin.y - screenBounds.minY) < threshold {
+            newY = screenBounds.minY
+        } else if abs((origin.y + size.height) - screenBounds.maxY) < threshold {
+            // Top edge
+            newY = screenBounds.maxY - size.height
+        }
+
+        return CGPoint(x: newX, y: newY)
     }
 }
 

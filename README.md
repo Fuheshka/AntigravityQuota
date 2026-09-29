@@ -67,6 +67,50 @@ flowchart LR
 | `⌘M` | Toggle compact HUD pill mode |
 | `⌘Q` | Quit AntigravityQuota |
 
+## Command Line Interface (CLI)
+
+AntigravityQuota supports a dedicated headless CLI mode for integration with **SketchyBar**, **SwiftBar**, **Raycast**, **tmux**, and terminal automation scripts. In CLI mode, the application skips all GUI lifecycles, makes a single RPC query to the local `language_server`, prints to `stdout`, and exits with code 0 (or code 1 on connection failure).
+
+### CLI Flags
+
+| Flag | Description | Example Output |
+| :--- | :--- | :--- |
+| `--status`, `-s` | Compact single-line quota status | `G 85.4% (1h 12m) · C 100.0%` |
+| `--json`, `-j` | Complete formatted JSON snapshot with pools and individual models | `{"summary": {...}, "groups": [...], "models": [...]}` |
+| `-h`, `--help` | Display usage and integration examples | Help reference |
+
+### CLI Symlink Installation
+
+To make `antigravity-quota` available system-wide:
+
+```bash
+# Automatic installer (creates ~/.local/bin or /usr/local/bin symlink)
+./scripts/install_cli_symlink.sh
+
+# Or manual symlink to /usr/local/bin:
+sudo ln -sf "/Applications/AntigravityQuota.app/Contents/MacOS/AntigravityQuota" /usr/local/bin/antigravity-quota
+```
+
+### Integrations
+
+- **SketchyBar**:
+  ```bash
+  sketchybar --set antigravity_quota label="$(antigravity-quota --status)"
+  ```
+
+- **SwiftBar / BitBar**:
+  ```bash
+  #!/usr/bin/env bash
+  antigravity-quota --status
+  echo "---"
+  echo "Open Antigravity | bash='/Applications/Antigravity.app'"
+  ```
+
+- **tmux status line**:
+  ```tmux
+  set -g status-right '#(antigravity-quota --status) | %H:%M'
+  ```
+
 ---
 
 ## Build & Installation

@@ -247,6 +247,38 @@ public final class StatusBarController: NSObject {
         toggleAutoHideItem.state = hudController.onlyWhenAntigravityActive ? .on : .off
         menu.addItem(toggleAutoHideItem)
 
+        let hudSettingsItem = NSMenuItem(title: Localization.hudSettingsSubmenu, action: nil, keyEquivalent: "")
+        let hudSettingsMenu = NSMenu()
+
+        let clickThroughItem = NSMenuItem(title: Localization.clickThroughMenuItem, action: #selector(toggleClickThrough), keyEquivalent: "")
+        clickThroughItem.target = self
+        clickThroughItem.state = hudController.isClickThroughEnabled ? .on : .off
+        hudSettingsMenu.addItem(clickThroughItem)
+
+        hudSettingsMenu.addItem(.separator())
+
+        let opacityTitleItem = NSMenuItem(title: Localization.hudOpacityTitle, action: nil, keyEquivalent: "")
+        opacityTitleItem.isEnabled = false
+        hudSettingsMenu.addItem(opacityTitleItem)
+
+        let opacity100Item = NSMenuItem(title: Localization.opacity100, action: #selector(setHUDOpacity100), keyEquivalent: "")
+        opacity100Item.target = self
+        opacity100Item.state = abs(hudController.hudOpacity - 1.0) < 0.05 ? .on : .off
+        hudSettingsMenu.addItem(opacity100Item)
+
+        let opacity75Item = NSMenuItem(title: Localization.opacity75, action: #selector(setHUDOpacity75), keyEquivalent: "")
+        opacity75Item.target = self
+        opacity75Item.state = abs(hudController.hudOpacity - 0.75) < 0.05 ? .on : .off
+        hudSettingsMenu.addItem(opacity75Item)
+
+        let opacity50Item = NSMenuItem(title: Localization.opacity50, action: #selector(setHUDOpacity50), keyEquivalent: "")
+        opacity50Item.target = self
+        opacity50Item.state = abs(hudController.hudOpacity - 0.50) < 0.05 ? .on : .off
+        hudSettingsMenu.addItem(opacity50Item)
+
+        hudSettingsItem.submenu = hudSettingsMenu
+        menu.addItem(hudSettingsItem)
+
         let launchAtLoginItem = NSMenuItem(title: Localization.launchAtLogin, action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
         launchAtLoginItem.target = self
         launchAtLoginItem.state = LaunchAgentManager.isEnabled ? .on : .off
@@ -310,6 +342,26 @@ public final class StatusBarController: NSObject {
 
     @objc private func toggleAutoHideHUD() {
         hudController.onlyWhenAntigravityActive.toggle()
+        rebuildMenu()
+    }
+
+    @objc private func toggleClickThrough() {
+        hudController.isClickThroughEnabled.toggle()
+        rebuildMenu()
+    }
+
+    @objc private func setHUDOpacity100() {
+        hudController.hudOpacity = 1.0
+        rebuildMenu()
+    }
+
+    @objc private func setHUDOpacity75() {
+        hudController.hudOpacity = 0.75
+        rebuildMenu()
+    }
+
+    @objc private func setHUDOpacity50() {
+        hudController.hudOpacity = 0.50
         rebuildMenu()
     }
 

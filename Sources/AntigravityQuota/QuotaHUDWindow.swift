@@ -230,10 +230,37 @@ struct QuotaHUDView: View {
     }
 }
 
+final class QuotaHUDPanel: NSPanel {
+    var isSnappingEnabled: Bool = true
+    var snapThreshold: CGFloat = 16.0
+
+    override var canBecomeKey: Bool { false }
+    override var canBecomeMain: Bool { false }
+
+    override func setFrameOrigin(_ newOrigin: NSPoint) {
+        guard isSnappingEnabled, let screenBounds = (screen ?? NSScreen.main)?.visibleFrame else {
+            super.setFrameOrigin(newOrigin)
+            return
+        }
+        let snapped = QuotaFormatter.snapOriginToScreenEdges(
+            origin: newOrigin,
+            size: frame.size,
+            screenBounds: screenBounds,
+            threshold: snapThreshold
+        )
+        super.setFrameOrigin(snapped)
+    }
+}
+
 @MainActor
 public final class QuotaHUDWindowController: NSObject {
     public let viewModel = QuotaViewModel()
     private var panel: NSPanel?
+
+    private var flagsChangedGlobalMonitor: Any?
+    private var flagsChangedLocalMonitor: Any?
+    private var mouseUpGlobalMonitor: Any?
+    private var mouseUpLocalMonitor: Any?
 
     public var isHUDEnabled: Bool {
         didSet {
@@ -249,6 +276,21 @@ public final class QuotaHUDWindowController: NSObject {
         }
     }
 
+    public var isClickThroughEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isClickThroughEnabled, forKey: "HUDClickThroughEnabled")
+            updateModifierMonitors()
+        }
+    }
+
+    public var hudOpacity: Double {
+        didSet {
+            let clamped = min(max(hudOpacity, 0.4), 1.0)
+            UserDefaults.standard.set(clamped, forKey: "HUDOpacity")
+            panel?.alphaValue = CGFloat(clamped)
+        }
+    }
+
     public override init() {
         let defaults = UserDefaults.standard
         if defaults.object(forKey: "HUDEnabled") == nil {
@@ -257,12 +299,25 @@ public final class QuotaHUDWindowController: NSObject {
         if defaults.object(forKey: "HUDOnlyInAntigravity") == nil {
             defaults.set(true, forKey: "HUDOnlyInAntigravity")
         }
+        if defaults.object(forKey: "HUDClickThroughEnabled") == nil {
+            defaults.set(false, forKey: "HUDClickThroughEnabled")
+        }
+        if defaults.object(forKey: "HUDOpacity") == nil {
+            defaults.set(1.0, forKey: "HUDOpacity")
+        }
+
         self.isHUDEnabled = defaults.bool(forKey: "HUDEnabled")
         self.onlyWhenAntigravityActive = defaults.bool(forKey: "HUDOnlyInAntigravity")
+        self.isClickThroughEnabled = defaults.bool(forKey: "HUDClickThroughEnabled")
+        let storedOpacity = defaults.double(forKey: "HUDOpacity")
+        self.hudOpacity = (storedOpacity >= 0.4 && storedOpacity <= 1.0) ? storedOpacity : 1.0
+
         super.init()
 
         setupPanel()
         setupWorkspaceObserver()
+        updateModifierMonitors()
+
         viewModel.onLayoutChange = { [weak self] in
             DispatchQueue.main.async {
                 self?.resizePanelToFit()
@@ -271,11 +326,18 @@ public final class QuotaHUDWindowController: NSObject {
         updateVisibility()
     }
 
+    deinit {
+        if let m = flagsChangedGlobalMonitor { NSEvent.removeMonitor(m) }
+        if let m = flagsChangedLocalMonitor { NSEvent.removeMonitor(m) }
+        if let m = mouseUpGlobalMonitor { NSEvent.removeMonitor(m) }
+        if let m = mouseUpLocalMonitor { NSEvent.removeMonitor(m) }
+    }
+
     private func setupPanel() {
         let hostingView = NSHostingView(rootView: QuotaHUDView(viewModel: viewModel))
         let fitting = hostingView.fittingSize
 
-        let p = NSPanel(
+        let p = QuotaHUDPanel(
             contentRect: NSRect(origin: .zero, size: fitting),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
@@ -288,6 +350,8 @@ public final class QuotaHUDWindowController: NSObject {
         p.hasShadow = true
         p.isMovableByWindowBackground = true
         p.hidesOnDeactivate = false
+        p.alphaValue = CGFloat(hudOpacity)
+        p.ignoresMouseEvents = isClickThroughEnabled
         p.contentView = hostingView
 
         restoreOrPlaceDefaultPosition(for: p, size: fitting)
@@ -297,9 +361,20 @@ public final class QuotaHUDWindowController: NSObject {
             object: p,
             queue: .main
         ) { [weak p] _ in
-            guard let origin = p?.frame.origin else { return }
-            UserDefaults.standard.set(Double(origin.x), forKey: "HUDOriginX")
-            UserDefaults.standard.set(Double(origin.y), forKey: "HUDOriginY")
+            guard let p = p else { return }
+            if let screenBounds = (p.screen ?? NSScreen.main)?.visibleFrame {
+                let snapped = QuotaFormatter.snapOriginToScreenEdges(
+                    origin: p.frame.origin,
+                    size: p.frame.size,
+                    screenBounds: screenBounds,
+                    threshold: 16.0
+                )
+                if snapped != p.frame.origin {
+                    p.setFrameOrigin(snapped)
+                }
+            }
+            UserDefaults.standard.set(Double(p.frame.origin.x), forKey: "HUDOriginX")
+            UserDefaults.standard.set(Double(p.frame.origin.y), forKey: "HUDOriginY")
         }
 
         self.panel = p
@@ -311,12 +386,116 @@ public final class QuotaHUDWindowController: NSObject {
            defaults.object(forKey: "HUDOriginY") != nil {
             let x = defaults.double(forKey: "HUDOriginX")
             let y = defaults.double(forKey: "HUDOriginY")
-            window.setFrameOrigin(NSPoint(x: x, y: y))
+            let restored = NSPoint(x: x, y: y)
+            let screenBounds = (window.screen ?? NSScreen.main)?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1728, height: 1080)
+            let snapped = QuotaFormatter.snapOriginToScreenEdges(
+                origin: restored,
+                size: size,
+                screenBounds: screenBounds,
+                threshold: 16.0
+            )
+            window.setFrameOrigin(snapped)
         } else if let screen = NSScreen.main?.visibleFrame {
-            // Bottom-right corner with clean padding
+            // Bottom-right corner with clean padding snapped
             let x = screen.maxX - size.width - 20
             let y = screen.minY + 24
-            window.setFrameOrigin(NSPoint(x: x, y: y))
+            let initial = NSPoint(x: x, y: y)
+            let snapped = QuotaFormatter.snapOriginToScreenEdges(
+                origin: initial,
+                size: size,
+                screenBounds: screen,
+                threshold: 16.0
+            )
+            window.setFrameOrigin(snapped)
+        }
+    }
+
+    private func updateMouseEventsState(forceOptionActive: Bool? = nil) {
+        guard let panel = panel else { return }
+        if !isClickThroughEnabled {
+            panel.ignoresMouseEvents = false
+            return
+        }
+        let isOptionDown = forceOptionActive ?? NSEvent.modifierFlags.contains(.option)
+        if isOptionDown {
+            panel.ignoresMouseEvents = false
+        } else {
+            if NSEvent.pressedMouseButtons == 0 {
+                panel.ignoresMouseEvents = true
+            }
+        }
+    }
+
+    private func updateModifierMonitors() {
+        if isClickThroughEnabled {
+            startModifierMonitors()
+            updateMouseEventsState()
+        } else {
+            stopModifierMonitors()
+            panel?.ignoresMouseEvents = false
+        }
+    }
+
+    private func startModifierMonitors() {
+        guard flagsChangedGlobalMonitor == nil else { return }
+
+        flagsChangedGlobalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+            Task { @MainActor in
+                self?.handleFlagsChanged(event)
+            }
+        }
+
+        flagsChangedLocalMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+            Task { @MainActor in
+                self?.handleFlagsChanged(event)
+            }
+            return event
+        }
+
+        mouseUpGlobalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseUp, .rightMouseUp, .otherMouseUp]) { [weak self] _ in
+            Task { @MainActor in
+                self?.handleMouseUp()
+            }
+        }
+
+        mouseUpLocalMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseUp, .rightMouseUp, .otherMouseUp]) { [weak self] event in
+            Task { @MainActor in
+                self?.handleMouseUp()
+            }
+            return event
+        }
+    }
+
+    private func stopModifierMonitors() {
+        if let m = flagsChangedGlobalMonitor {
+            NSEvent.removeMonitor(m)
+            flagsChangedGlobalMonitor = nil
+        }
+        if let m = flagsChangedLocalMonitor {
+            NSEvent.removeMonitor(m)
+            flagsChangedLocalMonitor = nil
+        }
+        if let m = mouseUpGlobalMonitor {
+            NSEvent.removeMonitor(m)
+            mouseUpGlobalMonitor = nil
+        }
+        if let m = mouseUpLocalMonitor {
+            NSEvent.removeMonitor(m)
+            mouseUpLocalMonitor = nil
+        }
+    }
+
+    private func handleFlagsChanged(_ event: NSEvent) {
+        guard isClickThroughEnabled else { return }
+        let isOptionDown = event.modifierFlags.contains(.option)
+        updateMouseEventsState(forceOptionActive: isOptionDown)
+    }
+
+    private func handleMouseUp() {
+        guard isClickThroughEnabled else { return }
+        let isOptionDown = NSEvent.modifierFlags.contains(.option)
+        if !isOptionDown {
+            panel?.ignoresMouseEvents = true
         }
     }
 
@@ -326,11 +505,18 @@ public final class QuotaHUDWindowController: NSObject {
         let oldFrame = panel.frame
         let newSize = contentView.fittingSize
         let screenBounds = (panel.screen ?? NSScreen.main)?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1728, height: 1080)
-        let targetFrame = QuotaFormatter.anchoredHUDFrame(
+        var targetFrame = QuotaFormatter.anchoredHUDFrame(
             oldFrame: oldFrame,
             newSize: newSize,
             screenBounds: screenBounds
         )
+        let snappedOrigin = QuotaFormatter.snapOriginToScreenEdges(
+            origin: targetFrame.origin,
+            size: targetFrame.size,
+            screenBounds: screenBounds,
+            threshold: 16.0
+        )
+        targetFrame.origin = snappedOrigin
         panel.setFrame(targetFrame, display: true, animate: false)
     }
 

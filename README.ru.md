@@ -67,6 +67,50 @@ flowchart LR
 | `⌘M` | Переключить компактный режим HUD (таблетка) |
 | `⌘Q` | Выйти из AntigravityQuota |
 
+## Интерфейс командной строки (CLI)
+
+AntigravityQuota поддерживает автономный CLI-режим для интеграции с **SketchyBar**, **SwiftBar**, **Raycast**, **tmux** и консольными скриптами автоматизации. В режиме CLI программа не запускает GUI и статус-бар, а выполняет один сетевой запрос к локальному `language_server`, выводит результат в `stdout` и завершает процесс с кодом 0 (или кодом 1 при ошибке связи).
+
+### Флаги командной строки
+
+| Флаг | Описание | Пример вывода |
+| :--- | :--- | :--- |
+| `--status`, `-s` | Компактный однострочный статус квот | `G 85.4% (1ч 12м) · C 100.0%` |
+| `--json`, `-j` | Полный форматированный JSON со всеми пулами и моделями | `{"summary": {...}, "groups": [...], "models": [...]}` |
+| `-h`, `--help` | Справка по использованию и примеры интеграций | Текст справки |
+
+### Установка симлинка CLI
+
+Для вызова команды `antigravity-quota` из любого терминала:
+
+```bash
+# Автоматический скрипт (создает симлинк в ~/.local/bin или /usr/local/bin)
+./scripts/install_cli_symlink.sh
+
+# Либо вручную в /usr/local/bin (требуются права администратора):
+sudo ln -sf "/Applications/AntigravityQuota.app/Contents/MacOS/AntigravityQuota" /usr/local/bin/antigravity-quota
+```
+
+### Примеры интеграций
+
+- **SketchyBar**:
+  ```bash
+  sketchybar --set antigravity_quota label="$(antigravity-quota --status)"
+  ```
+
+- **Плагин для SwiftBar / BitBar**:
+  ```bash
+  #!/usr/bin/env bash
+  antigravity-quota --status
+  echo "---"
+  echo "Open Antigravity | bash='/Applications/Antigravity.app'"
+  ```
+
+- **Строка состояния tmux**:
+  ```tmux
+  set -g status-right '#(antigravity-quota --status) | %H:%M'
+  ```
+
 ---
 
 ## Сборка и установка

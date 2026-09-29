@@ -177,5 +177,58 @@ final class QuotaCoreTests: XCTestCase {
         XCTAssertTrue(report.contains("50001"))
         XCTAssertTrue(report.contains("Gemini 5h: 80.0%"))
     }
+
+    func testSnapOriginToScreenEdges() {
+        let screen = CGRect(x: 0, y: 25, width: 1728, height: 1055)
+        let size = CGSize(width: 248, height: 126)
+
+        // 1. Within 16px of left edge -> snap to screen.minX (0)
+        let nearLeft = CGPoint(x: 12, y: 200)
+        let snappedLeft = QuotaFormatter.snapOriginToScreenEdges(origin: nearLeft, size: size, screenBounds: screen, threshold: 16.0)
+        XCTAssertEqual(snappedLeft.x, 0)
+        XCTAssertEqual(snappedLeft.y, 200)
+
+        // 2. Beyond 16px of left edge -> no snap
+        let farLeft = CGPoint(x: 20, y: 200)
+        let notSnapped = QuotaFormatter.snapOriginToScreenEdges(origin: farLeft, size: size, screenBounds: screen, threshold: 16.0)
+        XCTAssertEqual(notSnapped.x, 20)
+        XCTAssertEqual(notSnapped.y, 200)
+
+        // 3. Within 16px of right edge -> snap to screen.maxX - width (1728 - 248 = 1480)
+        // origin.x = 1475 -> origin.x + size.width = 1723. abs(1723 - 1728) = 5 < 16
+        let nearRight = CGPoint(x: 1475, y: 200)
+        let snappedRight = QuotaFormatter.snapOriginToScreenEdges(origin: nearRight, size: size, screenBounds: screen, threshold: 16.0)
+        XCTAssertEqual(snappedRight.x, 1480)
+        XCTAssertEqual(snappedRight.y, 200)
+
+        // 4. Within 16px of bottom edge (minY = 25) -> snap to 25
+        let nearBottom = CGPoint(x: 500, y: 32)
+        let snappedBottom = QuotaFormatter.snapOriginToScreenEdges(origin: nearBottom, size: size, screenBounds: screen, threshold: 16.0)
+        XCTAssertEqual(snappedBottom.x, 500)
+        XCTAssertEqual(snappedBottom.y, 25)
+
+        // 5. Within 16px of top edge (maxY = 1080) -> snap to 1080 - 126 = 954
+        // origin.y = 945 -> origin.y + size.height = 1071. abs(1071 - 1080) = 9 < 16
+        let nearTop = CGPoint(x: 500, y: 945)
+        let snappedTop = QuotaFormatter.snapOriginToScreenEdges(origin: nearTop, size: size, screenBounds: screen, threshold: 16.0)
+        XCTAssertEqual(snappedTop.x, 500)
+        XCTAssertEqual(snappedTop.y, 954)
+
+        // 6. Corner snapping (both X and Y within 16px)
+        let nearCorner = CGPoint(x: 1475, y: 30)
+        let snappedCorner = QuotaFormatter.snapOriginToScreenEdges(origin: nearCorner, size: size, screenBounds: screen, threshold: 16.0)
+        XCTAssertEqual(snappedCorner.x, 1480)
+        XCTAssertEqual(snappedCorner.y, 25)
+    }
+
+    func testHUDLocalizationSettings() {
+        XCTAssertFalse(Localization.hudSettingsSubmenu.isEmpty)
+        XCTAssertFalse(Localization.clickThroughMenuItem.isEmpty)
+        XCTAssertFalse(Localization.hudOpacityTitle.isEmpty)
+        XCTAssertFalse(Localization.opacity100.isEmpty)
+        XCTAssertFalse(Localization.opacity75.isEmpty)
+        XCTAssertFalse(Localization.opacity50.isEmpty)
+        XCTAssertFalse(Localization.aboutTipClickThrough.isEmpty)
+    }
 }
 
