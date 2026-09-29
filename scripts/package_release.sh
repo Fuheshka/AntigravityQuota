@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 APP_NAME="AntigravityQuota"
-VERSION="1.0.0"
+VERSION="1.1.0"
 DIST_DIR="dist"
 APP_BUNDLE="${DIST_DIR}/${APP_NAME}.app"
 ZIP_NAME="${APP_NAME}-v${VERSION}-macOS.zip"

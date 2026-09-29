@@ -104,7 +104,7 @@ public enum Localization {
         isRussian ? "Монитор квот и лимитов моделей Google Antigravity в реальном времени" : "Real-time model quota monitor & HUD for Google Antigravity"
     }
     public static var aboutVersionLabel: String {
-        isRussian ? "Версия 1.0.0 (macOS 13+)" : "Version 1.0.0 (macOS 13+)"
+        isRussian ? "Версия 1.1.0 (macOS 13+)" : "Version 1.1.0 (macOS 13+)"
     }
     public static var aboutServerStatusTitle: String {
         isRussian ? "Статус подключения" : "Connection Status"

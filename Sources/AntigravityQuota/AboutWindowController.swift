@@ -142,7 +142,7 @@ struct AboutView: View {
                         Text("AntigravityQuota")
                             .font(.system(size: 19, weight: .bold))
 
-                        Text("v1.0.0")
+                        Text("v1.1.0")
                             .font(.system(size: 11, weight: .semibold, design: .monospaced))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
