@@ -93,18 +93,18 @@ sudo ln -sf "/Applications/AntigravityQuota.app/Contents/MacOS/AntigravityQuota"
 
 ### Integrations
 
-- **SketchyBar**:
+Ready-to-use plugins with Nerd Font glyphs, dynamic color alerts, model breakdowns, and quick actions are provided in [`integrations/`](integrations/README.md):
+
+- **[SketchyBar Plugin](integrations/sketchybar/README.md)**:
+  `integrations/sketchybar/antigravity_quota.sh` formats live quotas with Nerd Font icons (`󰛩`, `󰚩`), reset timers, and ARGB threshold colors (>50% green, 20-50% orange, <20% red).
   ```bash
-  sketchybar --set antigravity_quota label="$(antigravity-quota --status)"
+  sketchybar --add item antigravity_quota right \
+             --set antigravity_quota update_freq=30 icon.drawing=off \
+                                     script="~/.config/sketchybar/plugins/antigravity_quota.sh"
   ```
 
-- **SwiftBar / BitBar**:
-  ```bash
-  #!/usr/bin/env bash
-  antigravity-quota --status
-  echo "---"
-  echo "Open Antigravity | bash='/Applications/Antigravity.app'"
-  ```
+- **[SwiftBar & BitBar Plugin](integrations/README.md#2-swiftbar-и-bitbar)**:
+  `integrations/swiftbar/antigravity_quota.1m.sh` provides a sleek menu bar status plus an interactive dropdown menu with model breakdown, rolling 5h / weekly window counters, and quick actions ("Open Antigravity", "Refresh Quotas").
 
 - **tmux status line**:
   ```tmux

@@ -21,36 +21,47 @@ import numpy as np
 raw_path, out_path = sys.argv[1], sys.argv[2]
 src = Image.open(raw_path).convert("RGBA")
 
-# Crop the squircle body (inset to [155..869] to eliminate outer background halo)
-crop = src.crop((155, 155, 869, 869))
-body_size = 832
+# Auto-detect squircle bounding box from solid dark or light background
+arr = np.array(src.convert("L"))
+if arr[0, 0] > 200:
+    mask_bg = arr < 240
+else:
+    mask_bg = arr > 20
+
+y_indices, x_indices = np.where(mask_bg)
+if len(x_indices) > 0 and len(y_indices) > 0:
+    x_min, x_max = int(x_indices.min()), int(x_indices.max())
+    y_min, y_max = int(y_indices.min()), int(y_indices.max())
+    w, h = x_max - x_min, y_max - y_min
+    dim = max(w, h)
+    cx, cy = (x_min + x_max) // 2, (y_min + y_max) // 2
+    crop_box = (cx - dim // 2, cy - dim // 2, cx + dim // 2, cy + dim // 2)
+    crop = src.crop(crop_box)
+else:
+    crop = src
+
+body_size = 824
+corner_radius = 185
 body = crop.resize((body_size, body_size), Image.Resampling.LANCZOS)
 
-# Build 4x supersampled anti-aliased rounded-squircle mask (Apple HIG proportions)
+# Build 4x supersampled anti-aliased squircle mask (Apple HIG proportions)
 scale = 4
 ss_size = body_size * scale
 mask_ss = Image.new("L", (ss_size, ss_size), 0)
 draw = ImageDraw.Draw(mask_ss)
-radius_ss = int(200 * scale)
-inset_ss = int(2 * scale)
-draw.rounded_rectangle(
-    (inset_ss, inset_ss, ss_size - 1 - inset_ss, ss_size - 1 - inset_ss),
-    radius=radius_ss,
-    fill=255,
-)
+draw.rounded_rectangle((0, 0, ss_size - 1, ss_size - 1), radius=corner_radius * scale, fill=255)
 mask = mask_ss.resize((body_size, body_size), Image.Resampling.LANCZOS)
 body.putalpha(mask)
 
-# Compose onto 1024x1024 canvas with subtle Apple HIG drop shadow
+# Compose onto 1024x1024 canvas with subtle Apple HIG contact shadow
 canvas = Image.new("RGBA", (1024, 1024), (0, 0, 0, 0))
 offset = (1024 - body_size) // 2
 
-shadow_alpha = mask.point(lambda a: int(a * 0.48))
 shadow = Image.new("RGBA", (1024, 1024), (0, 0, 0, 0))
-shadow_layer = Image.new("RGBA", (body_size, body_size), (0, 0, 0, 255))
-shadow_layer.putalpha(shadow_alpha)
-shadow.paste(shadow_layer, (offset, offset + 12))
-shadow = shadow.filter(ImageFilter.GaussianBlur(radius=18))
+s_draw = ImageDraw.Draw(shadow)
+s_box = [offset, offset + 10, offset + body_size, offset + body_size + 10]
+s_draw.rounded_rectangle(s_box, radius=corner_radius, fill=(0, 0, 0, 145))
+shadow = shadow.filter(ImageFilter.GaussianBlur(20))
 
 canvas = Image.alpha_composite(canvas, shadow)
 canvas.paste(body, (offset, offset), body)

@@ -25,6 +25,9 @@ fi
 if [ -f "Resources/AppIcon.icns" ]; then
     cp "Resources/AppIcon.icns" "${RESOURCES}/AppIcon.icns"
 fi
+if [ -f "Resources/AppIcon.png" ]; then
+    cp "Resources/AppIcon.png" "${RESOURCES}/AppIcon.png"
+fi
 
 cat > "${CONTENTS}/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>

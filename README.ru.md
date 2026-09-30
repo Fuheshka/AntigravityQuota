@@ -92,20 +92,20 @@ sudo ln -sf "/Applications/AntigravityQuota.app/Contents/MacOS/AntigravityQuota"
 ```
 
 ### Примеры интеграций
-
-- **SketchyBar**:
+ 
+Готовые легковесные плагины с Nerd Font иконками, цветовой индикацией, раскладкой моделей и быстрыми действиями доступны в папке [`integrations/`](integrations/README.md):
+ 
+- **[Плагин для SketchyBar](integrations/sketchybar/README.md)**:
+  Скрипт `integrations/sketchybar/antigravity_quota.sh` форматирует квоты с Nerd Font иконками (`󰛩`, `󰚩`), таймерами сброса и ARGB цветами (>50% зеленый, 20-50% оранжевый, <20% красный).
   ```bash
-  sketchybar --set antigravity_quota label="$(antigravity-quota --status)"
+  sketchybar --add item antigravity_quota right \
+             --set antigravity_quota update_freq=30 icon.drawing=off \
+                                     script="~/.config/sketchybar/plugins/antigravity_quota.sh"
   ```
-
-- **Плагин для SwiftBar / BitBar**:
-  ```bash
-  #!/usr/bin/env bash
-  antigravity-quota --status
-  echo "---"
-  echo "Open Antigravity | bash='/Applications/Antigravity.app'"
-  ```
-
+ 
+- **[Плагин для SwiftBar и BitBar](integrations/README.md#2-swiftbar-и-bitbar)**:
+  Плагин `integrations/swiftbar/antigravity_quota.1m.sh` выводит компактный статус в строку меню и разворачивает интерактивное выпадающее меню со списком моделей, счетчиками 5-часовых/недельных окон и быстрыми действиями («Открыть Antigravity», «Обновить квоты»).
+ 
 - **Строка состояния tmux**:
   ```tmux
   set -g status-right '#(antigravity-quota --status) | %H:%M'

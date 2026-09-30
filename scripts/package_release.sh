@@ -31,6 +31,9 @@ fi
 if [ -f "Resources/AppIcon.icns" ]; then
     cp "Resources/AppIcon.icns" "${APP_BUNDLE}/Contents/Resources/AppIcon.icns"
 fi
+if [ -f "Resources/AppIcon.png" ]; then
+    cp "Resources/AppIcon.png" "${APP_BUNDLE}/Contents/Resources/AppIcon.png"
+fi
 
 cat > "${APP_BUNDLE}/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
