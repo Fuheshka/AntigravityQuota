@@ -36,6 +36,7 @@ public final class StatusBarController: NSObject {
         setupWorkspaceObservers()
         refreshNow()
         updatePollingSchedule(forceReschedule: true)
+        checkUpdatesOnStartup()
     }
 
     deinit {
@@ -340,6 +341,10 @@ public final class StatusBarController: NSObject {
 
         menu.addItem(.separator())
 
+        let checkForUpdatesItem = NSMenuItem(title: Localization.checkForUpdates, action: #selector(checkForUpdatesManually), keyEquivalent: "")
+        checkForUpdatesItem.target = self
+        menu.addItem(checkForUpdatesItem)
+
         let aboutItem = NSMenuItem(title: Localization.aboutMenuItem, action: #selector(showAboutWindow), keyEquivalent: "")
         aboutItem.target = self
         menu.addItem(aboutItem)
@@ -349,6 +354,67 @@ public final class StatusBarController: NSObject {
         menu.addItem(quitItem)
 
         self.statusItem.menu = menu
+    }
+
+    private func checkUpdatesOnStartup() {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            let client = GitHubUpdateClient(repo: AntigravityQuotaGitHubRepo, currentVersion: AntigravityQuotaCurrentVersion)
+            let result = await client.checkForUpdates(platform: .macOS, force: false)
+            self.handleUpdateResult(result, isManual: false)
+        }
+    }
+
+    @objc public func checkForUpdatesManually() {
+        Task { @MainActor in
+            let client = GitHubUpdateClient(repo: AntigravityQuotaGitHubRepo, currentVersion: AntigravityQuotaCurrentVersion)
+            let result = await client.checkForUpdates(platform: .macOS, force: true)
+            self.handleUpdateResult(result, isManual: true)
+        }
+    }
+
+    private func handleUpdateResult(_ result: UpdateCheckResult, isManual: Bool) {
+        switch result {
+        case .updateAvailable(let newVersion, let release, let assetUrl):
+            let alert = NSAlert()
+            alert.messageText = Localization.updateAvailableTitle
+            alert.informativeText = Localization.updateAvailableMessage(newVersion: "v\(newVersion)")
+            alert.addButton(withTitle: Localization.downloadButton)
+            alert.addButton(withTitle: Localization.laterButton)
+            alert.alertStyle = .informational
+
+            if alert.runModal() == .alertFirstButtonReturn {
+                if let downloadUrl = assetUrl {
+                    NSWorkspace.shared.open(downloadUrl)
+                } else {
+                    NSWorkspace.shared.open(release.htmlUrl)
+                }
+            }
+        case .upToDate(let version):
+            if isManual {
+                let alert = NSAlert()
+                alert.messageText = Localization.upToDateTitle
+                alert.informativeText = Localization.upToDateMessage(version: version)
+                alert.alertStyle = .informational
+                alert.runModal()
+            }
+        case .throttled:
+            if isManual {
+                let alert = NSAlert()
+                alert.messageText = Localization.upToDateTitle
+                alert.informativeText = Localization.upToDateMessage(version: AntigravityQuotaCurrentVersion)
+                alert.alertStyle = .informational
+                alert.runModal()
+            }
+        case .failed(let reason):
+            if isManual {
+                let alert = NSAlert()
+                alert.messageText = Localization.updateErrorTitle
+                alert.informativeText = reason
+                alert.alertStyle = .warning
+                alert.runModal()
+            }
+        }
     }
 
     @objc private func showAboutWindow() {

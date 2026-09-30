@@ -1,6 +1,9 @@
 import Foundation
 import CoreGraphics
 
+public let AntigravityQuotaCurrentVersion = "1.1.0"
+public let AntigravityQuotaGitHubRepo = "Fuheshka/AntigravityQuota"
+
 public enum Localization {
     public static var isRussian: Bool {
         guard let lang = Locale.preferredLanguages.first?.lowercased() else { return true }
@@ -104,7 +107,34 @@ public enum Localization {
         isRussian ? "Монитор квот и лимитов моделей Google Antigravity в реальном времени" : "Real-time model quota monitor & HUD for Google Antigravity"
     }
     public static var aboutVersionLabel: String {
-        isRussian ? "Версия 1.1.0 (macOS 13+)" : "Version 1.1.0 (macOS 13+)"
+        isRussian ? "Версия \(AntigravityQuotaCurrentVersion) (macOS 13+)" : "Version \(AntigravityQuotaCurrentVersion) (macOS 13+)"
+    }
+    public static var checkForUpdates: String {
+        isRussian ? "Проверить обновления..." : "Check for Updates..."
+    }
+    public static var checkingForUpdates: String {
+        isRussian ? "Проверка обновлений..." : "Checking for Updates..."
+    }
+    public static var updateAvailableTitle: String {
+        isRussian ? "Доступно обновление" : "Update Available"
+    }
+    public static func updateAvailableMessage(newVersion: String) -> String {
+        isRussian ? "Доступна новая версия \(newVersion).\nХотите перейти к скачиванию?" : "A new version \(newVersion) is available.\nWould you like to download it?"
+    }
+    public static var downloadButton: String {
+        isRussian ? "Скачать" : "Download"
+    }
+    public static var laterButton: String {
+        isRussian ? "Позже" : "Later"
+    }
+    public static var upToDateTitle: String {
+        isRussian ? "Обновлений не найдено" : "You're Up to Date"
+    }
+    public static func upToDateMessage(version: String) -> String {
+        isRussian ? "У вас установлена самая свежая версия (\(version))." : "You are using the latest version (\(version))."
+    }
+    public static var updateErrorTitle: String {
+        isRussian ? "Ошибка проверки" : "Update Check Failed"
     }
     public static var aboutServerStatusTitle: String {
         isRussian ? "Статус подключения" : "Connection Status"

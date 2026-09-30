@@ -95,6 +95,50 @@ final class AboutViewModel: ObservableObject {
             NSWorkspace.shared.open(url)
         }
     }
+
+    @Published var isCheckingForUpdates: Bool = false
+    @Published var updateStatusMessage: String? = nil
+
+    func checkForUpdates() {
+        guard !isCheckingForUpdates else { return }
+        isCheckingForUpdates = true
+        updateStatusMessage = Localization.checkingForUpdates
+
+        Task { @MainActor in
+            let client = GitHubUpdateClient(repo: AntigravityQuotaGitHubRepo, currentVersion: AntigravityQuotaCurrentVersion)
+            let result = await client.checkForUpdates(platform: .macOS, force: true)
+            self.isCheckingForUpdates = false
+
+            switch result {
+            case .updateAvailable(let newVersion, let release, let assetUrl):
+                self.updateStatusMessage = "\(Localization.updateAvailableTitle): v\(newVersion)"
+                self.showUpdateAlert(release: release, newVersion: newVersion, assetUrl: assetUrl)
+            case .upToDate(let version):
+                self.updateStatusMessage = Localization.upToDateMessage(version: version)
+            case .throttled:
+                self.updateStatusMessage = Localization.upToDateMessage(version: AntigravityQuotaCurrentVersion)
+            case .failed(let reason):
+                self.updateStatusMessage = "\(Localization.updateErrorTitle): \(reason)"
+            }
+        }
+    }
+
+    private func showUpdateAlert(release: GitHubReleaseInfo, newVersion: String, assetUrl: URL?) {
+        let alert = NSAlert()
+        alert.messageText = Localization.updateAvailableTitle
+        alert.informativeText = Localization.updateAvailableMessage(newVersion: "v\(newVersion)")
+        alert.addButton(withTitle: Localization.downloadButton)
+        alert.addButton(withTitle: Localization.laterButton)
+        alert.alertStyle = .informational
+
+        if alert.runModal() == .alertFirstButtonReturn {
+            if let downloadUrl = assetUrl {
+                NSWorkspace.shared.open(downloadUrl)
+            } else {
+                NSWorkspace.shared.open(release.htmlUrl)
+            }
+        }
+    }
 }
 
 struct AboutView: View {
@@ -142,13 +186,33 @@ struct AboutView: View {
                         Text("AntigravityQuota")
                             .font(.system(size: 19, weight: .bold))
 
-                        Text("v1.1.0")
-                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        Button(action: { viewModel.checkForUpdates() }) {
+                            HStack(spacing: 4) {
+                                Text("v\(AntigravityQuotaCurrentVersion)")
+                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                if viewModel.isCheckingForUpdates {
+                                    ProgressView()
+                                        .controlSize(.mini)
+                                } else {
+                                    Image(systemName: "arrow.triangle.2.circlepath")
+                                        .font(.system(size: 9))
+                                }
+                            }
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(Color.accentColor.opacity(0.15))
                             .foregroundColor(.accentColor)
                             .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .help(Localization.checkForUpdates)
+                    }
+
+                    if let status = viewModel.updateStatusMessage {
+                        Text(status)
+                            .font(.system(size: 10.5, weight: .medium))
+                            .foregroundColor(.accentColor)
+                            .transition(.opacity)
                     }
 
                     Text(Localization.aboutSubtitle)
