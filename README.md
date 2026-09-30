@@ -137,9 +137,27 @@ open /Applications/AntigravityQuota.app
 
 ---
 
-## Author
+## Contributing
 
-Developed by **Daniil K. ([@Fuheshka](https://github.com/Fuheshka))**.
+Contributions to AntigravityQuota are warmly welcomed! Here is how you can help:
+
+- 🐛 **Report Bugs**: Encountered a glitch or crash? File a [Bug Report](https://github.com/Fuheshka/AntigravityQuota/issues/new?template=bug_report.md).
+- 💡 **Request Features**: Need a new status bar integration, custom HUD hotkey, or plugin? Submit a [Feature Request](https://github.com/Fuheshka/AntigravityQuota/issues/new?template=feature_request.md).
+- 🛠 **Submit Pull Requests**: Want to fix an issue or add a feature? Check out our [Contributing Guide (CONTRIBUTING.md)](CONTRIBUTING.md) and open a PR!
+- ⭐️ **Star the Repo**: Give the project a star on GitHub to help others discover it.
+
+---
+
+## Author & Support
+
+Made with passion and love ❤️
+
+**Daniil K. (Fuheshka)**
+
+- 💬 **Telegram:** [@fuheshka](https://t.me/fuheshka)
+- ✉️ **Email:** [me@kuviko.ru](mailto:me@kuviko.ru)
+- ☕ **Buy me a coffee (SBP / T-Pay):** [pay.cloudtips.ru/p/7adeaa28](https://pay.cloudtips.ru/p/7adeaa28)
+- 💎 **TON:** `UQC-DsraaDQRjUjG9oPRkt5nGlMgxKY-pjMC6xeeYGfxiu9a`
 
 ---
 
