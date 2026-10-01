@@ -100,6 +100,15 @@ public enum Localization {
     public static var sparklineTitle: String {
         isRussian ? "Динамика" : "Activity"
     }
+    public static var showSparklineInHUD: String {
+        isRussian ? "Показывать график расхода в карточке HUD" : "Show Consumption Chart in HUD Card"
+    }
+    public static var showSparklineChart: String {
+        isRussian ? "Показать график расхода" : "Show Consumption Chart"
+    }
+    public static var hideSparklineChart: String {
+        isRussian ? "Скрыть график расхода" : "Hide Consumption Chart"
+    }
     public static var quitApp: String {
         isRussian ? "Выйти из AntigravityQuota" : "Quit AntigravityQuota"
     }

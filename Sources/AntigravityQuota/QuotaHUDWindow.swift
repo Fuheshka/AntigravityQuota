@@ -23,12 +23,19 @@ public final class QuotaViewModel: ObservableObject {
             onLayoutChange?()
         }
     }
+    @Published public var isSparklineExpanded: Bool {
+        didSet {
+            UserDefaults.standard.set(isSparklineExpanded, forKey: "HUDSparklineExpanded")
+            onLayoutChange?()
+        }
+    }
 
     public var onRefreshRequested: (() -> Void)?
     public var onLayoutChange: (() -> Void)?
 
     public init() {
         self.isCompact = UserDefaults.standard.bool(forKey: "HUDCompactMode")
+        self.isSparklineExpanded = UserDefaults.standard.bool(forKey: "HUDSparklineExpanded")
     }
 }
 
@@ -374,10 +381,12 @@ struct QuotaHUDView: View {
                     )
                 }
 
-                Divider()
-                    .overlay(Color.white.opacity(0.12))
+                if viewModel.isSparklineExpanded {
+                    Divider()
+                        .overlay(Color.white.opacity(0.12))
 
-                QuotaSparklineView(data: viewModel.sparklineData)
+                    QuotaSparklineView(data: viewModel.sparklineData)
+                }
 
                 // Bottom control buttons
                 HStack(spacing: 6) {
@@ -386,6 +395,28 @@ struct QuotaHUDView: View {
                         .foregroundColor(.white.opacity(0.45))
 
                     Spacer()
+
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            viewModel.isSparklineExpanded.toggle()
+                        }
+                    }) {
+                        HStack(spacing: 3) {
+                            Image(systemName: "chart.xyaxis.line")
+                                .font(.system(size: 9, weight: .bold))
+                            Image(systemName: viewModel.isSparklineExpanded ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 7.5, weight: .bold))
+                        }
+                        .foregroundColor(viewModel.isSparklineExpanded ? Color(red: 0.45, green: 0.72, blue: 1.0) : .white.opacity(0.8))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 3)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                .fill(viewModel.isSparklineExpanded ? Color(red: 0.45, green: 0.72, blue: 1.0).opacity(0.18) : Color.white.opacity(0.08))
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .help(viewModel.isSparklineExpanded ? Localization.hideSparklineChart : Localization.showSparklineChart)
 
                     Button(action: { viewModel.onRefreshRequested?() }) {
                         HStack(spacing: 3.5) {
@@ -412,10 +443,12 @@ struct QuotaHUDView: View {
                     .foregroundColor(.white.opacity(0.65))
                     .padding(.vertical, 6)
 
-                Divider()
-                    .overlay(Color.white.opacity(0.12))
+                if viewModel.isSparklineExpanded {
+                    Divider()
+                        .overlay(Color.white.opacity(0.12))
 
-                QuotaSparklineView(data: viewModel.sparklineData)
+                    QuotaSparklineView(data: viewModel.sparklineData)
+                }
             }
         }
         .padding(.horizontal, 12)

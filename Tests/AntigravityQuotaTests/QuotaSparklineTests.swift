@@ -153,5 +153,11 @@ final class QuotaSparklineTests: XCTestCase {
         )
         XCTAssertTrue(zeroCoords.isEmpty)
     }
+
+    func testSparklineLocalizationKeys() {
+        XCTAssertFalse(Localization.showSparklineChart.isEmpty)
+        XCTAssertFalse(Localization.hideSparklineChart.isEmpty)
+        XCTAssertFalse(Localization.showSparklineInHUD.isEmpty)
+    }
 }
 

@@ -296,6 +296,11 @@ public final class StatusBarController: NSObject {
         clickThroughItem.state = hudController.isClickThroughEnabled ? .on : .off
         hudSettingsMenu.addItem(clickThroughItem)
 
+        let toggleSparklineItem = NSMenuItem(title: Localization.showSparklineInHUD, action: #selector(toggleHUDSparkline), keyEquivalent: "")
+        toggleSparklineItem.target = self
+        toggleSparklineItem.state = hudController.viewModel.isSparklineExpanded ? .on : .off
+        hudSettingsMenu.addItem(toggleSparklineItem)
+
         hudSettingsMenu.addItem(.separator())
 
         let opacityTitleItem = NSMenuItem(title: Localization.hudOpacityTitle, action: nil, keyEquivalent: "")
@@ -475,6 +480,11 @@ public final class StatusBarController: NSObject {
 
     @objc private func toggleClickThrough() {
         hudController.isClickThroughEnabled.toggle()
+        rebuildMenu()
+    }
+
+    @objc private func toggleHUDSparkline() {
+        hudController.viewModel.isSparklineExpanded.toggle()
         rebuildMenu()
     }
 
