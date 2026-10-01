@@ -83,7 +83,9 @@ AntigravityQuota supports a dedicated headless CLI mode for integration with **S
 
 ### CLI Symlink Installation
 
-To make `antigravity-quota` available system-wide:
+If installed via Homebrew Cask, the `antigravity-quota` binary is automatically linked to your PATH.
+
+For manual installations, to make `antigravity-quota` available system-wide:
 
 ```bash
 # Automatic installer (creates ~/.local/bin or /usr/local/bin symlink)
@@ -115,13 +117,34 @@ Ready-to-use plugins with Nerd Font glyphs, dynamic color alerts, model breakdow
 
 ---
 
-## Build & Installation
+## Installation
 
-### Requirements
-- macOS 13.0 (Ventura) or later
-- Swift 5.9+ (Xcode Command Line Tools)
+### Homebrew (Recommended)
+
+Install and keep AntigravityQuota updated with a single terminal command via Homebrew Cask:
+
+```bash
+# Tap official repository
+brew tap Fuheshka/antigravityquota https://github.com/Fuheshka/AntigravityQuota
+
+# Install AntigravityQuota (app bundle and antigravity-quota CLI binary)
+brew install --cask antigravity-quota
+```
+
+To update to the latest release in the future:
+```bash
+brew upgrade --cask antigravity-quota
+```
+
+### Manual Download
+
+Download the pre-packaged `.dmg` or `.zip` installer from [GitHub Releases](https://github.com/Fuheshka/AntigravityQuota/releases/latest).
 
 ### Build from Source
+
+#### Requirements
+- macOS 13.0 (Ventura) or later
+- Swift 5.9+ (Xcode Command Line Tools)
 
 ```bash
 git clone https://github.com/Fuheshka/AntigravityQuota.git

@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 APP_NAME="AntigravityQuota"
-VERSION="1.1.0"
+VERSION="${1:-1.1.0}"
 DIST_DIR="dist"
 APP_BUNDLE="${DIST_DIR}/${APP_NAME}.app"
 ZIP_NAME="${APP_NAME}-v${VERSION}-macOS.zip"
@@ -106,9 +106,24 @@ fi
 echo "=== 7. Finalizing DMG Bounds & Removing Scrollbars ==="
 python3 scripts/finalize_dmg_layout.py "${DIST_DIR}/${DMG_NAME}" "${APP_NAME}"
 
+echo "=== 8. Updating Homebrew Cask Formula ==="
+CASK_FILE="Casks/antigravity-quota.rb"
+if [ -f "${CASK_FILE}" ] && [ -f "${DIST_DIR}/${DMG_NAME}" ]; then
+    DMG_SHA256=$(shasum -a 256 "${DIST_DIR}/${DMG_NAME}" | awk '{print $1}')
+    echo "Calculated DMG SHA-256: ${DMG_SHA256}"
+    sed -i '' -E "s/version \"[^\"]+\"/version \"${VERSION}\"/" "${CASK_FILE}"
+    sed -i '' -E "s/sha256 \"[^\"]+\"/sha256 \"${DMG_SHA256}\"/" "${CASK_FILE}"
+    echo "Updated ${CASK_FILE} -> version: ${VERSION}, sha256: ${DMG_SHA256}"
+fi
+
 echo "=========================================="
 echo "🎉 Release Packaging Successful!"
-echo "App Bundle:  ${APP_BUNDLE}"
-echo "ZIP Archive: ${DIST_DIR}/${ZIP_NAME}"
-echo "DMG Image:   ${DIST_DIR}/${DMG_NAME}"
+echo "App Bundle:   ${APP_BUNDLE}"
+echo "ZIP Archive:  ${DIST_DIR}/${ZIP_NAME}"
+echo "DMG Image:    ${DIST_DIR}/${DMG_NAME}"
+if [ -n "${DMG_SHA256:-}" ]; then
+    echo "DMG SHA-256:  ${DMG_SHA256}"
+    echo "Cask Formula: ${CASK_FILE}"
+fi
 echo "=========================================="
+

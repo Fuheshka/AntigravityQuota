@@ -83,7 +83,9 @@ AntigravityQuota поддерживает автономный CLI-режим д
 
 ### Установка симлинка CLI
 
-Для вызова команды `antigravity-quota` из любого терминала:
+При установке через Homebrew Cask исполняемый файл `antigravity-quota` автоматически добавляется в системный PATH.
+
+При ручной установке для вызова команды `antigravity-quota` из любого терминала:
 
 ```bash
 # Автоматический скрипт (создает симлинк в ~/.local/bin или /usr/local/bin)
@@ -115,13 +117,34 @@ sudo ln -sf "/Applications/AntigravityQuota.app/Contents/MacOS/AntigravityQuota"
 
 ---
 
-## Сборка и установка
+## Установка и запуск
 
-### Системные требования
-- macOS 13.0 (Ventura) или новее
-- Swift 5.9+ (Xcode Command Line Tools)
+### Homebrew (рекомендуется)
+
+Установка и обновление AntigravityQuota одной терминальной командой через официальный Homebrew Cask:
+
+```bash
+# Подключение репозитория
+brew tap Fuheshka/antigravityquota https://github.com/Fuheshka/AntigravityQuota
+
+# Установка приложения и утилиты antigravity-quota в PATH
+brew install --cask antigravity-quota
+```
+
+Обновление до свежей версии:
+```bash
+brew upgrade --cask antigravity-quota
+```
+
+### Загрузка готового релиза
+
+Скачайте готовый `.dmg` или `.zip` установщик со страницы [GitHub Releases](https://github.com/Fuheshka/AntigravityQuota/releases/latest).
 
 ### Сборка из исходников
+
+#### Системные требования
+- macOS 13.0 (Ventura) или новее
+- Swift 5.9+ (Xcode Command Line Tools)
 
 ```bash
 git clone https://github.com/Fuheshka/AntigravityQuota.git
