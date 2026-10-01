@@ -57,35 +57,136 @@ flowchart LR
 ```
 
 ---
+---
 
-## Keyboard Shortcuts (Menu Bar)
+## Visual Overview & Interface
 
-| Shortcut | Action |
-| :--- | :--- |
-| `⌘R` | Force refresh quotas immediately |
-| `⌘H` | Show / hide floating HUD widget |
-| `⌘M` | Toggle compact HUD pill mode |
-| `⌘Q` | Quit AntigravityQuota |
+<div align="center">
+
+### Floating HUD Widget & Compact Pill Mode
+
+<img src="docs/assets/hud_preview.png" alt="AntigravityQuota Floating HUD & Compact Pill Mode" width="720" />
+
+<p align="center">
+  <em>Dual adaptive display modes: a translucent 256 pt HUD card with color-coded progress bars, burn rate trends, and 3-hour activity sparklines, collapsible into an unobtrusive floating pill.</em>
+</p>
+
+<img src="docs/assets/hud_preview.gif" alt="AntigravityQuota Smooth Pill-to-Card Morph Animation" width="600" />
+
+<p align="center">
+  <em>Fluid, interruptible morph transition between expanded card and compact pill with zero lag.</em>
+</p>
+
+<br/>
+
+### Menu Bar Status Item & Dropdown Menu
+
+<img src="docs/assets/menu_bar_preview.png" alt="AntigravityQuota Menu Bar Status Item & Dropdown Menu" width="780" />
+
+<p align="center">
+  <em>Live menu bar gauge (<code>3.8%↓ · 100%→</code>), 5-hour and weekly reset countdowns, nested per-model breakdown submenu, and customizable HUD toggles.</em>
+</p>
+
+<br/>
+
+### About & Diagnostics Window
+
+<img src="docs/assets/about_diagnostics_preview.png" alt="AntigravityQuota About & Diagnostics Window" width="550" />
+
+<p align="center">
+  <em>Live server connection metrics (PID, active API ports), notification toggles, global hotkeys reference, helpful tips, and one-click diagnostic report copying.</em>
+</p>
+
+</div>
+
+---
+
+## Global Hotkeys & Interaction
+
+AntigravityQuota registers system-wide global hotkeys via the native macOS **Carbon Event HotKey API**. They operate globally across all desktops and full-screen applications with **zero Accessibility (TCC) or Input Monitoring permissions required**.
+
+| Hotkey | Action | Scope | Description |
+| :--- | :--- | :--- | :--- |
+| **`⌥⇧Q`** (`Option + Shift + Q`) | Toggle HUD Visibility | Global | Instantly shows or hides the floating HUD widget on screen. |
+| **`⌥⇧M`** (`Option + Shift + M`) | Toggle Pill / Card Mode | Global | Switches between the compact floating pill and the expanded 256 pt card. |
+| **`⌥⇧R`** (`Option + Shift + R`) | Force Refresh Quotas | Global | Immediately queries local Connect RPC endpoints for fresh quota balances. |
+| **`⌘Q`** (`Command + Q`) | Quit Application | In-App / Menu | Safely terminates the background daemon and removes status bar items. |
+
+### Mouse Interaction & Window Management
+- **One-Click Morph**: Click anywhere on the compact pill (or the expand icon `↖↘`) to expand it into the full HUD card. Click the minus button (`−`) in the card header to collapse back to the pill.
+- **Draggable with Magnetic Snapping**: Drag the HUD anywhere on screen. It automatically snaps to screen edges within a 16 pt margin and persists coordinates in `UserDefaults`.
+- **Smart Window Anchoring**: Stays in the floating utility window level (`.floating`) on all virtual spaces (`.canJoinAllSpaces`, `.fullScreenAuxiliary`). Anchors to its bottom-right coordinate so changing modes never pushes it offscreen.
+- **Click-Through Mode**: When enabled in HUD Settings, clicks pass straight through the HUD to the editor beneath. Hold **`⌥ Option`** to temporarily grab and interact with the HUD without toggling the setting.
+- **Auto-Hide Outside Antigravity**: Automatically conceals the HUD when you switch to other apps and restores it the instant `Antigravity.app` becomes active.
+
+---
 
 ## Command Line Interface (CLI)
 
-AntigravityQuota supports a dedicated headless CLI mode for integration with **SketchyBar**, **SwiftBar**, **Raycast**, **tmux**, and terminal automation scripts. In CLI mode, the application skips all GUI lifecycles, makes a single RPC query to the local `language_server`, prints to `stdout`, and exits with code 0 (or code 1 on connection failure).
+AntigravityQuota includes a dedicated headless CLI mode (`antigravity-quota`) optimized for scripting, terminal multiplexers (**tmux**, **zellij**), custom status bars (**SketchyBar**, **SwiftBar**, **Waybar**), and launcher workflows (**Raycast**, **Alfred**).
 
-### CLI Flags
+In CLI mode, the application bypasses all GUI lifecycles, performs a single Connect-RPC request to the local `language_server`, outputs the formatted response to `stdout`, and terminates immediately with code 0 (or code 1 on connection failure).
 
-| Flag | Description | Example Output |
+### CLI Flags & Commands
+
+| Flag | Purpose | Example Output / Format |
 | :--- | :--- | :--- |
-| `--status`, `-s` | Compact single-line quota status | `G 85.4% (1h 12m) · C 100.0%` |
-| `--json`, `-j` | Complete formatted JSON snapshot with pools and individual models | `{"summary": {...}, "groups": [...], "models": [...]}` |
-| `--history` | Terminal table of recent quota measurements from local disk history | Formatted ASCII/Unicode table |
-| `--export-history` | Export full measurement history (last 7 days) as JSON to stdout | `[{"timestamp": "...", "geminiPercentage": 85.4, ...}]` |
-| `-h`, `--help` | Display usage and integration examples | Help reference |
+| `--status`, `-s` | Compact single-line quota string | `G 85.4% (1h 12m) · C 100.0%` |
+| `--json`, `-j` | Complete formatted JSON snapshot | Detailed JSON with pools, models, and reset times |
+| `--history` | Recent measurements table from disk history | Unicode Box-Drawing ASCII table |
+| `--export-history` | Export full 7-day disk history as JSON | Array of historical measurement points |
+| `-h`, `--help` | Display usage and integration examples | Full CLI help reference |
+
+#### Example: Compact Status Output
+```bash
+antigravity-quota --status
+# Output: G 85.4% (1h 12m) · C 100.0%
+```
+
+#### Example: Complete JSON Snapshot
+```bash
+antigravity-quota --json
+```
+```json
+{
+  "updatedAt": "2026-10-01T10:24:00Z",
+  "summary": {
+    "gemini": { "percentage": 85.4, "resetCountdown": "1h 12m", "resetTime": "2026-10-01T11:36:00Z" },
+    "claude": { "percentage": 100.0, "resetCountdown": "—", "resetTime": "2026-10-01T15:24:00Z" },
+    "status": "G 85.4% (1h 12m) · C 100.0%"
+  },
+  "groups": [
+    {
+      "displayName": "Gemini Models",
+      "shortName": "Gemini",
+      "buckets": [
+        { "window": "5h", "percentage": 85.4, "remainingFraction": 0.854, "resetCountdown": "1h 12m" },
+        { "window": "weekly", "percentage": 94.0, "remainingFraction": 0.940, "resetCountdown": "3d 8h" }
+      ]
+    }
+  ]
+}
+```
+
+#### Example: Local History Table
+```bash
+antigravity-quota --history
+```
+```text
+┌──────────────────────┬─────────────┬─────────────┐
+│ Date & Time          │ Gemini Pool │ Claude Pool │
+├──────────────────────┼─────────────┼─────────────┤
+│ 2026-10-01 10:24:00  │ 85.4%       │ 100.0%      │
+│ 2026-10-01 10:20:00  │ 86.8%       │ 100.0%      │
+│ 2026-10-01 10:00:00  │ 92.1%       │ 100.0%      │
+└──────────────────────┴─────────────┴─────────────┘
+```
 
 ### CLI Symlink Installation
 
-If installed via Homebrew Cask, the `antigravity-quota` binary is automatically linked to your PATH.
+If installed via Homebrew Cask, the `antigravity-quota` binary is automatically linked into your PATH.
 
-For manual installations, to make `antigravity-quota` available system-wide:
+For manual installations, create the symlink system-wide:
 
 ```bash
 # Automatic installer (creates ~/.local/bin or /usr/local/bin symlink)
@@ -97,20 +198,20 @@ sudo ln -sf "/Applications/AntigravityQuota.app/Contents/MacOS/AntigravityQuota"
 
 ### Integrations
 
-Ready-to-use plugins with Nerd Font glyphs, dynamic color alerts, model breakdowns, and quick actions are provided in [`integrations/`](integrations/README.md):
+Ready-to-use scripts with Nerd Font glyphs, dynamic status color alerts, model breakdowns, and quick actions are provided in [`integrations/`](integrations/README.md):
 
+- **[Raycast Script Command](integrations/raycast/antigravity-quota.sh)**:
+  Displays live quota balance inline directly inside your Raycast search bar, with `--full` detail view on command.
 - **[SketchyBar Plugin](integrations/sketchybar/README.md)**:
-  `integrations/sketchybar/antigravity_quota.sh` formats live quotas with Nerd Font icons (`󰛩`, `󰚩`), reset timers, and ARGB threshold colors (>50% green, 20-50% orange, <20% red).
+  `integrations/sketchybar/antigravity_quota.sh` formats quotas with Nerd Font icons (`󰛩`, `󰚩`), countdown clocks, and dynamic status alert colors (>50% green, 20-50% orange, <20% red).
   ```bash
   sketchybar --add item antigravity_quota right \
              --set antigravity_quota update_freq=30 icon.drawing=off \
                                      script="~/.config/sketchybar/plugins/antigravity_quota.sh"
   ```
-
-- **[SwiftBar & BitBar Plugin](integrations/README.md#2-swiftbar-и-bitbar)**:
-  `integrations/swiftbar/antigravity_quota.1m.sh` provides a sleek menu bar status plus an interactive dropdown menu with model breakdown, rolling 5h / weekly window counters, and quick actions ("Open Antigravity", "Refresh Quotas").
-
-- **tmux status line**:
+- **[SwiftBar & BitBar Plugin](integrations/swiftbar/antigravity_quota.1m.sh)**:
+  Menu bar status plus an interactive dropdown menu with model breakdown, rolling 5h / weekly window counters, and quick actions ("Open Antigravity", "Refresh Quotas").
+- **tmux Status Line**:
   ```tmux
   set -g status-right '#(antigravity-quota --status) | %H:%M'
   ```

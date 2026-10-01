@@ -8,5 +8,7 @@ DerivedData/
 *.dmg
 *.zip
 dist/
-docs/
+docs/*
+!docs/assets/
 implementation-notes.md
+
