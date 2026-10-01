@@ -330,6 +330,11 @@ public final class StatusBarController: NSObject {
         toggleNotificationsItem.state = QuotaNotificationManager.shared.isNotificationsEnabled ? .on : .off
         menu.addItem(toggleNotificationsItem)
 
+        let toggleSoundAlertsItem = NSMenuItem(title: Localization.soundAlertsMenuItem, action: #selector(toggleSoundAlerts), keyEquivalent: "")
+        toggleSoundAlertsItem.target = self
+        toggleSoundAlertsItem.state = QuotaNotificationManager.shared.isSoundAlertsEnabled ? .on : .off
+        menu.addItem(toggleSoundAlertsItem)
+
         let toggleTrendItem = NSMenuItem(title: Localization.showTrendInMenuBar, action: #selector(toggleShowTrendInMenuBar), keyEquivalent: "")
         toggleTrendItem.target = self
         toggleTrendItem.state = isTrendInMenuBarEnabled ? .on : .off
@@ -495,6 +500,11 @@ public final class StatusBarController: NSObject {
 
     @objc private func toggleNotifications() {
         QuotaNotificationManager.shared.isNotificationsEnabled.toggle()
+        rebuildMenu()
+    }
+
+    @objc private func toggleSoundAlerts() {
+        QuotaNotificationManager.shared.isSoundAlertsEnabled.toggle()
         rebuildMenu()
     }
 

@@ -17,6 +17,7 @@ public final class AboutWindowController: NSObject, NSWindowDelegate {
         viewModel.snapshot = snapshot
         viewModel.endpoint = QuotaClient.shared.currentEndpoint ?? ServerDiscovery.discoverActiveServer()
         viewModel.isNotificationsEnabled = QuotaNotificationManager.shared.isNotificationsEnabled
+        viewModel.isSoundAlertsEnabled = QuotaNotificationManager.shared.isSoundAlertsEnabled
         viewModel.isGlobalHotkeysEnabled = GlobalHotkeyManager.shared.isEnabled
         viewModel.geminiBurnRate = QuotaHistoryTracker.shared.burnRate(for: .gemini)
         viewModel.claudeBurnRate = QuotaHistoryTracker.shared.burnRate(for: .claude)
@@ -64,6 +65,11 @@ final class AboutViewModel: ObservableObject {
     @Published var isNotificationsEnabled: Bool = QuotaNotificationManager.shared.isNotificationsEnabled {
         didSet {
             QuotaNotificationManager.shared.isNotificationsEnabled = isNotificationsEnabled
+        }
+    }
+    @Published var isSoundAlertsEnabled: Bool = QuotaNotificationManager.shared.isSoundAlertsEnabled {
+        didSet {
+            QuotaNotificationManager.shared.isSoundAlertsEnabled = isSoundAlertsEnabled
         }
     }
     @Published var isGlobalHotkeysEnabled: Bool = GlobalHotkeyManager.shared.isEnabled {
@@ -364,6 +370,13 @@ struct AboutView: View {
 
             Toggle(isOn: $viewModel.isNotificationsEnabled) {
                 Text(Localization.aboutSettingNotifications)
+                    .font(.system(size: 11))
+            }
+            .toggleStyle(.switch)
+            .controlSize(.small)
+
+            Toggle(isOn: $viewModel.isSoundAlertsEnabled) {
+                Text(Localization.aboutSettingSoundAlerts)
                     .font(.system(size: 11))
             }
             .toggleStyle(.switch)

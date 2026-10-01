@@ -153,4 +153,91 @@ final class QuotaNotificationTests: XCTestCase {
         XCTAssertTrue(enLowBody.contains("Claude"))
         XCTAssertTrue(enLowBody.contains("8%"))
     }
+
+    func testSoundAlertDecisionForResetEventPlaysGlass() {
+        let event = QuotaNotificationEvent.reset(poolName: "Gemini")
+        let sound = QuotaSoundDecision.soundToPlay(
+            for: event,
+            soundAlertsEnabled: true,
+            isDoNotDisturbActive: false
+        )
+        XCTAssertEqual(sound, .glass)
+        XCTAssertEqual(sound?.systemSoundNames, ["Glass"])
+    }
+
+    func testSoundAlertDecisionForCriticalLowQuotaBelow5PercentPlaysSubmarineOrSosumi() {
+        let event = QuotaNotificationEvent.lowQuota(poolName: "Claude", remainingPercentage: 4.5)
+        let sound = QuotaSoundDecision.soundToPlay(
+            for: event,
+            soundAlertsEnabled: true,
+            isDoNotDisturbActive: false
+        )
+        XCTAssertEqual(sound, .submarineOrSosumi)
+        XCTAssertEqual(sound?.systemSoundNames, ["Submarine", "Sosumi"])
+    }
+
+    func testSoundAlertDecisionForNonCriticalLowQuotaAbove5PercentDoesNotPlaySound() {
+        let event = QuotaNotificationEvent.lowQuota(poolName: "Claude", remainingPercentage: 8.0)
+        let sound = QuotaSoundDecision.soundToPlay(
+            for: event,
+            soundAlertsEnabled: true,
+            isDoNotDisturbActive: false
+        )
+        XCTAssertNil(sound, "Quotas above 5% must not trigger critical sound alerts")
+    }
+
+    func testSoundAlertsDisabledByUserSuppressesAllSounds() {
+        let resetEvent = QuotaNotificationEvent.reset(poolName: "Gemini")
+        let lowEvent = QuotaNotificationEvent.lowQuota(poolName: "Claude", remainingPercentage: 3.0)
+
+        let resetSound = QuotaSoundDecision.soundToPlay(
+            for: resetEvent,
+            soundAlertsEnabled: false,
+            isDoNotDisturbActive: false
+        )
+        let lowSound = QuotaSoundDecision.soundToPlay(
+            for: lowEvent,
+            soundAlertsEnabled: false,
+            isDoNotDisturbActive: false
+        )
+
+        XCTAssertNil(resetSound, "Sound alerts disabled by user must suppress reset sound")
+        XCTAssertNil(lowSound, "Sound alerts disabled by user must suppress critical sound")
+    }
+
+    func testDoNotDisturbActiveSuppressesAllSounds() {
+        let resetEvent = QuotaNotificationEvent.reset(poolName: "Gemini")
+        let lowEvent = QuotaNotificationEvent.lowQuota(poolName: "Claude", remainingPercentage: 2.0)
+
+        let resetSound = QuotaSoundDecision.soundToPlay(
+            for: resetEvent,
+            soundAlertsEnabled: true,
+            isDoNotDisturbActive: true
+        )
+        let lowSound = QuotaSoundDecision.soundToPlay(
+            for: lowEvent,
+            soundAlertsEnabled: true,
+            isDoNotDisturbActive: true
+        )
+
+        XCTAssertNil(resetSound, "Active Do Not Disturb must suppress reset sound")
+        XCTAssertNil(lowSound, "Active Do Not Disturb must suppress critical sound")
+    }
+
+    func testSoundAlertsLocalizationRussianAndEnglish() {
+        let ruMenuItem = Localization.soundAlertsMenuItem(isRussian: true)
+        let enMenuItem = Localization.soundAlertsMenuItem(isRussian: false)
+        XCTAssertEqual(ruMenuItem, "Звуковые сигналы")
+        XCTAssertEqual(enMenuItem, "Sound Alerts")
+
+        let ruAboutSetting = Localization.aboutSettingSoundAlerts(isRussian: true)
+        let enAboutSetting = Localization.aboutSettingSoundAlerts(isRussian: false)
+        XCTAssertTrue(ruAboutSetting.contains("Звуковые сигналы"))
+        XCTAssertTrue(ruAboutSetting.contains("Glass"))
+        XCTAssertTrue(ruAboutSetting.contains("Submarine"))
+        XCTAssertTrue(enAboutSetting.contains("Sound Alerts") || enAboutSetting.contains("sound alerts"))
+        XCTAssertTrue(enAboutSetting.contains("Glass"))
+        XCTAssertTrue(enAboutSetting.contains("Submarine"))
+    }
 }
+

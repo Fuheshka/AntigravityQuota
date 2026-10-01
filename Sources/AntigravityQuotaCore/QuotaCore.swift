@@ -214,6 +214,18 @@ public enum Localization {
     public static var aboutSettingNotifications: String {
         isRussian ? "Уведомления macOS о сбросе и низком остатке (<10%)" : "macOS alerts on quota reset & low remaining (<10%)"
     }
+    public static func soundAlertsMenuItem(isRussian: Bool = Localization.isRussian) -> String {
+        isRussian ? "Звуковые сигналы" : "Sound Alerts"
+    }
+    public static var soundAlertsMenuItem: String {
+        soundAlertsMenuItem(isRussian: isRussian)
+    }
+    public static func aboutSettingSoundAlerts(isRussian: Bool = Localization.isRussian) -> String {
+        isRussian ? "Звуковые сигналы при сбросе квот (Glass) и критическом исчерпании (Submarine)" : "Play sound alerts on quota reset (Glass) and critical limit (Submarine)"
+    }
+    public static var aboutSettingSoundAlerts: String {
+        aboutSettingSoundAlerts(isRussian: isRussian)
+    }
 
     public static func notificationsResetTitle(isRussian: Bool = Localization.isRussian) -> String {
         isRussian ? "Квоты сброшены" : "Quotas Reset"
@@ -689,6 +701,51 @@ public final class QuotaNotificationEvaluator {
     public func resetState() {
         poolStates.removeAll()
         isFirstEvaluation = true
+    }
+}
+
+// MARK: - Quota Sound Alerts
+
+public enum QuotaSoundAlert: Equatable, Sendable {
+    case glass
+    case submarineOrSosumi
+
+    public var systemSoundNames: [String] {
+        switch self {
+        case .glass:
+            return ["Glass"]
+        case .submarineOrSosumi:
+            return ["Submarine", "Sosumi"]
+        }
+    }
+}
+
+public struct QuotaSoundDecision: Sendable {
+    /// Determines whether a native macOS system sound should be played for a given quota notification event.
+    ///
+    /// Rules:
+    /// 1. If sound alerts are disabled by the user (`soundAlertsEnabled == false`) -> nil.
+    /// 2. If macOS Do Not Disturb or Focus mode is active (`isDoNotDisturbActive == true`) -> nil.
+    /// 3. Reset to 100% -> `.glass` ("Glass").
+    /// 4. Critical low quota (remaining percentage <= 5.0%) -> `.submarineOrSosumi` ("Submarine" / "Sosumi").
+    /// 5. Non-critical low quota (> 5.0%) -> nil.
+    public static func soundToPlay(
+        for event: QuotaNotificationEvent,
+        soundAlertsEnabled: Bool,
+        isDoNotDisturbActive: Bool
+    ) -> QuotaSoundAlert? {
+        guard soundAlertsEnabled else { return nil }
+        guard !isDoNotDisturbActive else { return nil }
+
+        switch event {
+        case .reset:
+            return .glass
+        case .lowQuota(_, let remainingPercentage):
+            if remainingPercentage <= 5.0 {
+                return .submarineOrSosumi
+            }
+            return nil
+        }
     }
 }
 

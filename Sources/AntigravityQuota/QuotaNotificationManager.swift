@@ -1,11 +1,14 @@
 import Foundation
+import AppKit
 import UserNotifications
+import Intents
 import AntigravityQuotaCore
 
 @MainActor
 public final class QuotaNotificationManager: NSObject, UNUserNotificationCenterDelegate {
     public static let shared = QuotaNotificationManager()
     public static let userDefaultsKey = "QuotaNotificationsEnabled"
+    public static let soundAlertsUserDefaultsKey = "QuotaSoundAlertsEnabled"
 
     private let evaluator = QuotaNotificationEvaluator()
     private var hasRequestedAuth = false
@@ -22,6 +25,38 @@ public final class QuotaNotificationManager: NSObject, UNUserNotificationCenterD
             UserDefaults.standard.set(newValue, forKey: Self.userDefaultsKey)
             if newValue {
                 requestAuthorizationIfNeeded()
+            }
+        }
+    }
+
+    public var isSoundAlertsEnabled: Bool {
+        get {
+            // Default to true if not explicitly disabled by user
+            if UserDefaults.standard.object(forKey: Self.soundAlertsUserDefaultsKey) == nil {
+                return true
+            }
+            return UserDefaults.standard.bool(forKey: Self.soundAlertsUserDefaultsKey)
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: Self.soundAlertsUserDefaultsKey)
+        }
+    }
+
+    public static func isDoNotDisturbActive() -> Bool {
+        if #available(macOS 12.0, *) {
+            if INFocusStatusCenter.default.focusStatus.isFocused == true {
+                return true
+            }
+        }
+        return CFPreferencesGetAppBooleanValue("doNotDisturb" as CFString, "com.apple.notificationcenterui" as CFString, nil)
+    }
+
+    public var dndChecker: () -> Bool = { QuotaNotificationManager.isDoNotDisturbActive() }
+    public var soundPlayer: (QuotaSoundAlert) -> Void = { soundAlert in
+        for name in soundAlert.systemSoundNames {
+            if let sound = NSSound(named: NSSound.Name(name)) {
+                sound.play()
+                return
             }
         }
     }
@@ -50,11 +85,22 @@ public final class QuotaNotificationManager: NSObject, UNUserNotificationCenterD
     }
 
     public func processSnapshot(_ snapshot: QuotaSnapshot) {
-        guard isNotificationsEnabled else { return }
+        guard isNotificationsEnabled || isSoundAlertsEnabled else { return }
 
         let events = evaluator.evaluate(snapshot: snapshot)
+        let dndActive = dndChecker()
+
         for event in events {
-            sendNotification(for: event)
+            if isNotificationsEnabled {
+                sendNotification(for: event)
+            }
+            if let soundAlert = QuotaSoundDecision.soundToPlay(
+                for: event,
+                soundAlertsEnabled: isSoundAlertsEnabled,
+                isDoNotDisturbActive: dndActive
+            ) {
+                soundPlayer(soundAlert)
+            }
         }
     }
 
@@ -62,7 +108,7 @@ public final class QuotaNotificationManager: NSObject, UNUserNotificationCenterD
         let content = UNMutableNotificationContent()
         content.title = event.title
         content.body = event.body
-        content.sound = .default
+        content.sound = nil
 
         let identifier: String
         switch event {
@@ -88,9 +134,10 @@ public final class QuotaNotificationManager: NSObject, UNUserNotificationCenterD
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
         if #available(macOS 14.0, *) {
-            completionHandler([.banner, .sound, .list])
+            completionHandler([.banner, .list])
         } else {
-            completionHandler([.banner, .sound])
+            completionHandler([.banner])
         }
     }
 }
+
