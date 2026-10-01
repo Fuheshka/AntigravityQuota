@@ -213,6 +213,7 @@ public final class StatusBarController: NSObject {
             let cBurn = QuotaHistoryTracker.shared.burnRate(for: .claude)
             self.hudController.viewModel.geminiBurnRate = gBurn
             self.hudController.viewModel.claudeBurnRate = cBurn
+            self.hudController.viewModel.sparklineData = QuotaHistoryTracker.shared.sparklineData()
 
             self.updateStatusButtonTitle()
             self.rebuildMenu()

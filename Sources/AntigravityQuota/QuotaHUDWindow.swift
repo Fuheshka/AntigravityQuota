@@ -13,6 +13,9 @@ public final class QuotaViewModel: ObservableObject {
     @Published public var claudeBurnRate: QuotaBurnRate? {
         didSet { onLayoutChange?() }
     }
+    @Published public var sparklineData: QuotaSparklineData = QuotaHistoryTracker.shared.sparklineData() {
+        didSet { onLayoutChange?() }
+    }
     @Published public var isRefreshing: Bool = false
     @Published public var isCompact: Bool {
         didSet {
@@ -44,6 +47,195 @@ struct VisualEffectBackground: NSViewRepresentable {
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
         nsView.material = material
         nsView.blendingMode = blendingMode
+    }
+}
+
+struct QuotaSparklineView: View {
+    let data: QuotaSparklineData
+
+    private func formatDuration(_ duration: TimeInterval) -> String {
+        let hours = max(1, Int((duration / 3600.0).rounded()))
+        return Localization.isRussian ? "~\(hours)ч" : "~\(hours)h"
+    }
+
+    private func curvePaths(for points: [CGPoint], height: CGFloat) -> (line: Path, area: Path) {
+        var line = Path()
+        guard let first = points.first else { return (line, line) }
+        line.move(to: first)
+
+        if points.count == 2 {
+            line.addLine(to: points[1])
+        } else {
+            for i in 0..<(points.count - 1) {
+                let p0 = points[i]
+                let p1 = points[i + 1]
+                let dx = p1.x - p0.x
+                let cp1 = CGPoint(x: p0.x + dx * 0.5, y: p0.y)
+                let cp2 = CGPoint(x: p0.x + dx * 0.5, y: p1.y)
+                line.addCurve(to: p1, control1: cp1, control2: cp2)
+            }
+        }
+
+        var area = line
+        if let last = points.last {
+            area.addLine(to: CGPoint(x: last.x, y: height))
+            area.addLine(to: CGPoint(x: first.x, y: height))
+            area.closeSubpath()
+        }
+
+        return (line, area)
+    }
+
+    var body: some View {
+        VStack(spacing: 5) {
+            // Legend
+            HStack(spacing: 8) {
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color(red: 0.28, green: 0.65, blue: 1.0))
+                        .frame(width: 5, height: 5)
+                    Text("Gemini")
+                        .font(.system(size: 9.5, weight: .medium))
+                        .foregroundColor(.white.opacity(0.72))
+                }
+
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color(red: 0.78, green: 0.48, blue: 1.0))
+                        .frame(width: 5, height: 5)
+                    Text("Claude")
+                        .font(.system(size: 9.5, weight: .medium))
+                        .foregroundColor(.white.opacity(0.72))
+                }
+
+                Spacer()
+
+                if data.hasSufficientData {
+                    Text(formatDuration(data.windowDuration))
+                        .font(.system(size: 9, weight: .regular, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.45))
+                }
+            }
+
+            // Chart area
+            ZStack {
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(Color.white.opacity(0.04))
+
+                if !data.hasSufficientData {
+                    GeometryReader { geo in
+                        ZStack {
+                            Path { p in
+                                p.move(to: CGPoint(x: 4, y: geo.size.height / 2))
+                                p.addLine(to: CGPoint(x: geo.size.width - 4, y: geo.size.height / 2))
+                            }
+                            .stroke(style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                            .foregroundColor(Color.white.opacity(0.18))
+
+                            HStack(spacing: 4) {
+                                Image(systemName: "chart.xyaxis.line")
+                                    .font(.system(size: 8.5))
+                                Text(Localization.sparklineCollectingData)
+                                    .font(.system(size: 9, weight: .medium))
+                            }
+                            .foregroundColor(Color.white.opacity(0.55))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2)
+                            .background(
+                                Capsule()
+                                    .fill(Color.black.opacity(0.55))
+                                    .overlay(Capsule().strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5))
+                            )
+                        }
+                    }
+                } else {
+                    GeometryReader { geo in
+                        let size = geo.size
+                        let windowStart = Date().addingTimeInterval(-data.windowDuration)
+
+                        let gCoords = QuotaSparklineBuilder.normalizedPoints(
+                            for: data.geminiPoints,
+                            in: size,
+                            windowStart: windowStart,
+                            windowDuration: data.windowDuration,
+                            topInset: 3.0,
+                            bottomInset: 3.0
+                        )
+
+                        let cCoords = QuotaSparklineBuilder.normalizedPoints(
+                            for: data.claudePoints,
+                            in: size,
+                            windowStart: windowStart,
+                            windowDuration: data.windowDuration,
+                            topInset: 3.0,
+                            bottomInset: 3.0
+                        )
+
+                        ZStack {
+                            // Midline reference (50%)
+                            Path { p in
+                                p.move(to: CGPoint(x: 0, y: size.height / 2))
+                                p.addLine(to: CGPoint(x: size.width, y: size.height / 2))
+                            }
+                            .stroke(style: StrokeStyle(lineWidth: 0.5, dash: [3, 3]))
+                            .foregroundColor(Color.white.opacity(0.08))
+
+                            // Claude (Purple)
+                            if cCoords.count >= 2 {
+                                let (linePath, areaPath) = curvePaths(for: cCoords, height: size.height)
+                                areaPath.fill(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(red: 0.78, green: 0.48, blue: 1.0).opacity(0.20),
+                                            Color(red: 0.78, green: 0.48, blue: 1.0).opacity(0.01)
+                                        ],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
+                                linePath.stroke(
+                                    Color(red: 0.78, green: 0.48, blue: 1.0),
+                                    style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round)
+                                )
+                                if let last = cCoords.last {
+                                    Circle()
+                                        .fill(Color(red: 0.78, green: 0.48, blue: 1.0))
+                                        .frame(width: 3.5, height: 3.5)
+                                        .position(last)
+                                }
+                            }
+
+                            // Gemini (Cyan/Blue)
+                            if gCoords.count >= 2 {
+                                let (linePath, areaPath) = curvePaths(for: gCoords, height: size.height)
+                                areaPath.fill(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(red: 0.28, green: 0.65, blue: 1.0).opacity(0.24),
+                                            Color(red: 0.28, green: 0.65, blue: 1.0).opacity(0.01)
+                                        ],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
+                                linePath.stroke(
+                                    Color(red: 0.28, green: 0.65, blue: 1.0),
+                                    style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round)
+                                )
+                                if let last = gCoords.last {
+                                    Circle()
+                                        .fill(Color(red: 0.28, green: 0.65, blue: 1.0))
+                                        .frame(width: 3.5, height: 3.5)
+                                        .position(last)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .frame(height: 38)
+            .clipped()
+        }
     }
 }
 
@@ -154,14 +346,6 @@ struct QuotaHUDView: View {
 
                 Spacer()
 
-                Button(action: { viewModel.onRefreshRequested?() }) {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 10.5, weight: .bold))
-                        .foregroundColor(viewModel.isRefreshing ? .yellow : .white.opacity(0.75))
-                }
-                .buttonStyle(.plain)
-                .help(Localization.refreshNow)
-
                 Button(action: { viewModel.isCompact = true }) {
                     Image(systemName: "minus")
                         .font(.system(size: 10.5, weight: .bold))
@@ -189,11 +373,49 @@ struct QuotaHUDView: View {
                         burnRate: viewModel.claudeBurnRate
                     )
                 }
+
+                Divider()
+                    .overlay(Color.white.opacity(0.12))
+
+                QuotaSparklineView(data: viewModel.sparklineData)
+
+                // Bottom control buttons
+                HStack(spacing: 6) {
+                    Text("\(Localization.updatedPrefix) \(QuotaFormatter.formatClockTime(snap.updatedAt))")
+                        .font(.system(size: 9, weight: .regular, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.45))
+
+                    Spacer()
+
+                    Button(action: { viewModel.onRefreshRequested?() }) {
+                        HStack(spacing: 3.5) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(viewModel.isRefreshing ? .yellow : .white.opacity(0.8))
+                            Text(Localization.refreshShort)
+                                .font(.system(size: 9.5, weight: .medium))
+                                .foregroundColor(.white.opacity(0.8))
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                .fill(Color.white.opacity(0.08))
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .help(Localization.refreshNow)
+                }
             } else {
                 Text(Localization.serverOffline)
                     .font(.system(size: 11))
                     .foregroundColor(.white.opacity(0.65))
                     .padding(.vertical, 6)
+
+                Divider()
+                    .overlay(Color.white.opacity(0.12))
+
+                QuotaSparklineView(data: viewModel.sparklineData)
             }
         }
         .padding(.horizontal, 12)

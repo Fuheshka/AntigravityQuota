@@ -127,7 +127,7 @@ public final class QuotaHistoryTracker: @unchecked Sendable {
     private let diskQueue = DispatchQueue(label: "com.fuheshka.AntigravityQuota.history-disk", qos: .utility)
 
     public init(
-        windowDuration: TimeInterval = 3600.0,
+        windowDuration: TimeInterval = 18000.0,
         storageURL: URL? = nil,
         maxRetentionDays: Int = 7,
         startDate: Date = Date()
@@ -278,6 +278,18 @@ public final class QuotaHistoryTracker: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return samples.count
+    }
+
+    public func recentSamples(maxAge: TimeInterval = 18000.0, now: Date = Date()) -> [QuotaHistorySample] {
+        lock.lock()
+        defer { lock.unlock() }
+        let cutoff = now.addingTimeInterval(-maxAge)
+        return samples.filter { $0.timestamp >= cutoff && $0.timestamp <= now }
+    }
+
+    public func sparklineData(now: Date = Date()) -> QuotaSparklineData {
+        let recent = recentSamples(maxAge: 18000.0, now: now)
+        return QuotaSparklineBuilder.build(from: recent, now: now)
     }
 
     public func burnRate(for pool: QuotaPool, now: Date = Date()) -> QuotaBurnRate {

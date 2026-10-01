@@ -91,6 +91,15 @@ public enum Localization {
     public static var updatedPrefix: String {
         isRussian ? "Обновлено в" : "Updated at"
     }
+    public static var refreshShort: String {
+        isRussian ? "Обновить" : "Refresh"
+    }
+    public static var sparklineCollectingData: String {
+        isRussian ? "Сбор статистики..." : "Collecting statistics..."
+    }
+    public static var sparklineTitle: String {
+        isRussian ? "Динамика" : "Activity"
+    }
     public static var quitApp: String {
         isRussian ? "Выйти из AntigravityQuota" : "Quit AntigravityQuota"
     }
@@ -753,4 +762,117 @@ public struct GlobalHotkeyCore: Sendable {
         return GlobalHotkeyAction(rawValue: id)
     }
 }
+
+// MARK: - Sparkline Data & Builder
+
+public struct QuotaSparklinePoint: Equatable, Sendable {
+    public let timestamp: Date
+    public let percentage: Double
+
+    public init(timestamp: Date, percentage: Double) {
+        self.timestamp = timestamp
+        self.percentage = percentage
+    }
+}
+
+public struct QuotaSparklineData: Equatable, Sendable {
+    public let geminiPoints: [QuotaSparklinePoint]
+    public let claudePoints: [QuotaSparklinePoint]
+    public let windowDuration: TimeInterval
+    public let hasSufficientData: Bool
+
+    public init(
+        geminiPoints: [QuotaSparklinePoint] = [],
+        claudePoints: [QuotaSparklinePoint] = [],
+        windowDuration: TimeInterval = 3600.0,
+        hasSufficientData: Bool = false
+    ) {
+        self.geminiPoints = geminiPoints
+        self.claudePoints = claudePoints
+        self.windowDuration = windowDuration
+        self.hasSufficientData = hasSufficientData
+    }
+
+    public static let empty = QuotaSparklineData()
+}
+
+public enum QuotaSparklineBuilder {
+    public static func build(
+        from samples: [QuotaHistorySample],
+        now: Date = Date(),
+        minDuration: TimeInterval = 3600.0,
+        maxDuration: TimeInterval = 18000.0
+    ) -> QuotaSparklineData {
+        let cutoff = now.addingTimeInterval(-maxDuration)
+        let filtered = samples
+            .filter { $0.timestamp >= cutoff && $0.timestamp <= now }
+            .sorted { $0.timestamp < $1.timestamp }
+
+        guard filtered.count >= 2,
+              let first = filtered.first,
+              let last = filtered.last,
+              last.timestamp.timeIntervalSince(first.timestamp) >= 5.0 else {
+            return QuotaSparklineData(
+                geminiPoints: [],
+                claudePoints: [],
+                windowDuration: minDuration,
+                hasSufficientData: false
+            )
+        }
+
+        let timeSpan = now.timeIntervalSince(first.timestamp)
+        let effectiveWindow = min(max(timeSpan, minDuration), maxDuration)
+
+        func buildPoints(extract: (QuotaHistorySample) -> Double?) -> [QuotaSparklinePoint] {
+            var points: [QuotaSparklinePoint] = []
+            for s in filtered {
+                if let val = extract(s) {
+                    let clamped = min(max(val, 0.0), 100.0)
+                    points.append(QuotaSparklinePoint(timestamp: s.timestamp, percentage: clamped))
+                }
+            }
+            if let lastPoint = points.last, now.timeIntervalSince(lastPoint.timestamp) >= 1.0 {
+                points.append(QuotaSparklinePoint(timestamp: now, percentage: lastPoint.percentage))
+            }
+            return points
+        }
+
+        let geminiPoints = buildPoints { $0.geminiPercentage }
+        let claudePoints = buildPoints { $0.claudePercentage }
+
+        let hasData = (geminiPoints.count >= 2 || claudePoints.count >= 2)
+
+        return QuotaSparklineData(
+            geminiPoints: geminiPoints,
+            claudePoints: claudePoints,
+            windowDuration: effectiveWindow,
+            hasSufficientData: hasData
+        )
+    }
+
+    public static func normalizedPoints(
+        for points: [QuotaSparklinePoint],
+        in size: CGSize,
+        windowStart: Date,
+        windowDuration: TimeInterval,
+        topInset: CGFloat = 2.0,
+        bottomInset: CGFloat = 2.0
+    ) -> [CGPoint] {
+        guard !points.isEmpty, windowDuration > 0, size.width > 0, size.height > (topInset + bottomInset) else {
+            return []
+        }
+        let usableHeight = size.height - topInset - bottomInset
+
+        return points.map { pt in
+            let progress = pt.timestamp.timeIntervalSince(windowStart) / windowDuration
+            let clampedProgress = CGFloat(min(max(progress, 0.0), 1.0))
+            let x = clampedProgress * size.width
+            let yRatio = CGFloat(pt.percentage / 100.0)
+            let clampedYRatio = min(max(yRatio, 0.0), 1.0)
+            let y = topInset + (1.0 - clampedYRatio) * usableHeight
+            return CGPoint(x: x, y: y)
+        }
+    }
+}
+
 
