@@ -47,6 +47,20 @@ if command != .gui {
             FileHandle.standardError.write(Data("Error: Failed to serialize JSON: \(error)\n".utf8))
             exit(1)
         }
+    case .history:
+        let records = QuotaHistoryTracker.shared.loadHistoryRecords()
+        print(CLIFormatter.formatHistoryTable(records: records))
+        exit(0)
+    case .exportHistory:
+        let records = QuotaHistoryTracker.shared.loadHistoryRecords()
+        do {
+            let json = try CLIFormatter.formatHistoryJSON(records: records)
+            print(json)
+            exit(0)
+        } catch {
+            FileHandle.standardError.write(Data("Error: Failed to serialize history JSON: \(error)\n".utf8))
+            exit(1)
+        }
     case .gui:
         break
     }

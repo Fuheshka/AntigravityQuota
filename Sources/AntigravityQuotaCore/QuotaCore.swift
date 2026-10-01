@@ -222,7 +222,24 @@ public enum Localization {
         let pctStr = String(format: "%.0f%%", percent)
         return isRussian ? "\(pool): осталось \(pctStr)" : "\(pool): \(pctStr) remaining"
     }
+
+    public static func historyEmpty(isRussian: Bool = Localization.isRussian) -> String {
+        isRussian ? "История замеров пуста." : "No quota history records found."
+    }
+
+    public static func historyTableHeaderDate(isRussian: Bool = Localization.isRussian) -> String {
+        isRussian ? "Дата и время" : "Date & Time"
+    }
+
+    public static func historyTableHeaderGemini(isRussian: Bool = Localization.isRussian) -> String {
+        isRussian ? "Пул Gemini" : "Gemini Pool"
+    }
+
+    public static func historyTableHeaderClaude(isRussian: Bool = Localization.isRussian) -> String {
+        isRussian ? "Пул Claude" : "Claude Pool"
+    }
 }
+
 
 
 public struct QuotaBucket: Equatable, Sendable {

@@ -77,6 +77,8 @@ AntigravityQuota supports a dedicated headless CLI mode for integration with **S
 | :--- | :--- | :--- |
 | `--status`, `-s` | Compact single-line quota status | `G 85.4% (1h 12m) · C 100.0%` |
 | `--json`, `-j` | Complete formatted JSON snapshot with pools and individual models | `{"summary": {...}, "groups": [...], "models": [...]}` |
+| `--history` | Terminal table of recent quota measurements from local disk history | Formatted ASCII/Unicode table |
+| `--export-history` | Export full measurement history (last 7 days) as JSON to stdout | `[{"timestamp": "...", "geminiPercentage": 85.4, ...}]` |
 | `-h`, `--help` | Display usage and integration examples | Help reference |
 
 ### CLI Symlink Installation

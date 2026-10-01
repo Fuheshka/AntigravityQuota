@@ -108,6 +108,65 @@ final class CLITests: XCTestCase {
         let help = CLIFormatter.helpMessage()
         XCTAssertTrue(help.contains("--status"))
         XCTAssertTrue(help.contains("--json"))
+        XCTAssertTrue(help.contains("--history"))
+        XCTAssertTrue(help.contains("--export-history"))
         XCTAssertTrue(help.contains("--help"))
     }
+
+    func testCLIArgumentsParsingHistoryFlags() {
+        XCTAssertEqual(CLIArguments.parse(args: ["/path/to/binary", "--history"]), .history)
+        XCTAssertEqual(CLIArguments.parse(args: ["/path/to/binary", "--export-history"]), .exportHistory)
+    }
+
+    func testFormatHistoryTableWithRecords() {
+        let t1 = Date(timeIntervalSince1970: 1700000000)
+        let t2 = Date(timeIntervalSince1970: 1700000300)
+        let records = [
+            QuotaHistorySample(timestamp: t1, geminiPercentage: 85.0, claudePercentage: 100.0),
+            QuotaHistorySample(timestamp: t2, geminiPercentage: 80.5, claudePercentage: 95.0)
+        ]
+
+        let tableRU = CLIFormatter.formatHistoryTable(records: records, isRussian: true)
+        XCTAssertTrue(tableRU.contains("Дата и время"))
+        XCTAssertTrue(tableRU.contains("Пул Gemini"))
+        XCTAssertTrue(tableRU.contains("Пул Claude"))
+        XCTAssertTrue(tableRU.contains("85.0%"))
+        XCTAssertTrue(tableRU.contains("80.5%"))
+        XCTAssertTrue(tableRU.contains("100.0%"))
+        XCTAssertTrue(tableRU.contains("┌"))
+        XCTAssertTrue(tableRU.contains("└"))
+
+        let tableEN = CLIFormatter.formatHistoryTable(records: records, isRussian: false)
+        XCTAssertTrue(tableEN.contains("Date & Time"))
+        XCTAssertTrue(tableEN.contains("Gemini Pool"))
+        XCTAssertTrue(tableEN.contains("Claude Pool"))
+    }
+
+    func testFormatHistoryTableEmpty() {
+        let emptyRU = CLIFormatter.formatHistoryTable(records: [], isRussian: true)
+        XCTAssertEqual(emptyRU, "История замеров пуста.")
+
+        let emptyEN = CLIFormatter.formatHistoryTable(records: [], isRussian: false)
+        XCTAssertEqual(emptyEN, "No quota history records found.")
+    }
+
+    func testFormatHistoryJSON() throws {
+        let t1 = Date(timeIntervalSince1970: 1700000000)
+        let records = [
+            QuotaHistorySample(timestamp: t1, geminiPercentage: 85.0, claudePercentage: 100.0)
+        ]
+
+        let jsonString = try CLIFormatter.formatHistoryJSON(records: records)
+        guard let data = jsonString.data(using: .utf8),
+              let jsonArray = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+            XCTFail("Output is not valid JSON array")
+            return
+        }
+
+        XCTAssertEqual(jsonArray.count, 1)
+        XCTAssertEqual(jsonArray[0]["geminiPercentage"] as? Double, 85.0)
+        XCTAssertEqual(jsonArray[0]["claudePercentage"] as? Double, 100.0)
+        XCTAssertNotNil(jsonArray[0]["timestamp"])
+    }
 }
+

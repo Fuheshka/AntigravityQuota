@@ -208,4 +208,151 @@ final class QuotaHistoryTrackerTests: XCTestCase {
         XCTAssertEqual(rate25m.formatted(isRussian: true), "-40%/ч (хватит на ~25м)")
         XCTAssertEqual(rate25m.formatted(isRussian: false), "-40%/h (~25m left)")
     }
+
+    func testCodableQuotaHistorySample() throws {
+        let now = Date(timeIntervalSince1970: 1700000000)
+        let sample = QuotaHistorySample(timestamp: now, geminiPercentage: 85.5, claudePercentage: 90.0)
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(sample)
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let decoded = try decoder.decode(QuotaHistorySample.self, from: data)
+
+        XCTAssertEqual(decoded.timestamp, now)
+        XCTAssertEqual(decoded.geminiPercentage, 85.5)
+        XCTAssertEqual(decoded.claudePercentage, 90.0)
+
+        // Test backward-compatibility decoding with "gemini" and "claude" keys
+        let legacyJSON = """
+        {"timestamp":"2023-11-14T22:13:20Z","gemini":77.4,"claude":88.2}
+        """.data(using: .utf8)!
+        let legacyDecoded = try decoder.decode(QuotaHistorySample.self, from: legacyJSON)
+        XCTAssertEqual(legacyDecoded.geminiPercentage, 77.4)
+        XCTAssertEqual(legacyDecoded.claudePercentage, 88.2)
+    }
+
+    func testAppendSampleToDiskAsync() throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let fileURL = tempDir.appendingPathComponent("history.jsonl")
+        let tracker = QuotaHistoryTracker(storageURL: fileURL)
+
+        let t1 = Date(timeIntervalSince1970: 1700000000)
+        let t2 = Date(timeIntervalSince1970: 1700000300)
+
+        tracker.record(gemini: 95.0, claude: 100.0, at: t1)
+        tracker.record(gemini: 90.0, claude: 95.0, at: t2)
+
+        tracker.flushDiskQueue()
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fileURL.path))
+        let content = try String(contentsOf: fileURL, encoding: .utf8)
+        let lines = content.components(separatedBy: "\n").filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        XCTAssertEqual(lines.count, 2)
+
+        let records = tracker.loadHistoryRecords()
+        XCTAssertEqual(records.count, 2)
+        XCTAssertEqual(records[0].geminiPercentage, 95.0)
+        XCTAssertEqual(records[1].geminiPercentage, 90.0)
+    }
+
+    func testLoadHistoryRecordsFromDiskHandlesMalformedLines() throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let fileURL = tempDir.appendingPathComponent("history.jsonl")
+        let t1 = Date().addingTimeInterval(-120)
+        let t2 = Date().addingTimeInterval(-60)
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+
+        let validLine1 = String(data: try encoder.encode(QuotaHistorySample(timestamp: t1, geminiPercentage: 80.0, claudePercentage: 90.0)), encoding: .utf8)! + "\n"
+        let badLine = "{corrupted json\n"
+        let validLine2 = String(data: try encoder.encode(QuotaHistorySample(timestamp: t2, geminiPercentage: 75.0, claudePercentage: 85.0)), encoding: .utf8)! + "\n"
+        let content = validLine1 + badLine + validLine2
+        try content.write(to: fileURL, atomically: true, encoding: .utf8)
+
+        let tracker = QuotaHistoryTracker(storageURL: fileURL)
+        let records = tracker.loadHistoryRecords()
+        XCTAssertEqual(records.count, 2)
+        XCTAssertEqual(records[0].geminiPercentage, 80.0)
+        XCTAssertEqual(records[1].geminiPercentage, 75.0)
+    }
+
+    func testAutomaticRotationPrunesEntriesOlderThanSevenDays() throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let fileURL = tempDir.appendingPathComponent("history.jsonl")
+        let now = Date(timeIntervalSince1970: 1700000000)
+
+        // 10 days ago (should be pruned)
+        let t10DaysAgo = now.addingTimeInterval(-10 * 86400)
+        // 8 days ago (should be pruned)
+        let t8DaysAgo = now.addingTimeInterval(-8 * 86400)
+        // 5 days ago (should be kept)
+        let t5DaysAgo = now.addingTimeInterval(-5 * 86400)
+        // 1 hour ago (should be kept)
+        let t1HourAgo = now.addingTimeInterval(-3600)
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        var lines: [String] = []
+        for (date, g, c) in [(t10DaysAgo, 100.0, 100.0), (t8DaysAgo, 95.0, 95.0), (t5DaysAgo, 90.0, 90.0), (t1HourAgo, 85.0, 85.0)] {
+            let sample = QuotaHistorySample(timestamp: date, geminiPercentage: g, claudePercentage: c)
+            let data = try encoder.encode(sample)
+            lines.append(String(data: data, encoding: .utf8)!)
+        }
+        try lines.joined(separator: "\n").appending("\n").write(to: fileURL, atomically: true, encoding: .utf8)
+
+        // Creating tracker should perform rotation upon startup
+        let tracker = QuotaHistoryTracker(storageURL: fileURL, startDate: now)
+
+        let remaining = tracker.loadHistoryRecords()
+        XCTAssertEqual(remaining.count, 2)
+        XCTAssertEqual(remaining[0].geminiPercentage, 90.0)
+        XCTAssertEqual(remaining[1].geminiPercentage, 85.0)
+
+        // Subsequent rotation should find 0 additional entries to prune
+        let subsequentPruned = tracker.rotateHistory(now: now, retentionDays: 7)
+        XCTAssertEqual(subsequentPruned, 0)
+    }
+
+    func testRotationKeepsFileCleanWhenAllEntriesAreRecent() throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let fileURL = tempDir.appendingPathComponent("history.jsonl")
+        let now = Date(timeIntervalSince1970: 1700000000)
+
+        let t2DaysAgo = now.addingTimeInterval(-2 * 86400)
+        let t1DayAgo = now.addingTimeInterval(-1 * 86400)
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        var lines: [String] = []
+        for (date, g, c) in [(t2DaysAgo, 90.0, 90.0), (t1DayAgo, 85.0, 85.0)] {
+            let sample = QuotaHistorySample(timestamp: date, geminiPercentage: g, claudePercentage: c)
+            let data = try encoder.encode(sample)
+            lines.append(String(data: data, encoding: .utf8)!)
+        }
+        try lines.joined(separator: "\n").appending("\n").write(to: fileURL, atomically: true, encoding: .utf8)
+
+        let tracker = QuotaHistoryTracker(storageURL: fileURL, startDate: now)
+        let prunedCount = tracker.rotateHistory(now: now, retentionDays: 7)
+        XCTAssertEqual(prunedCount, 0)
+
+        let records = tracker.loadHistoryRecords()
+        XCTAssertEqual(records.count, 2)
+    }
 }
+

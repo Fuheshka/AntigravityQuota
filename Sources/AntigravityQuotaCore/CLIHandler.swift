@@ -4,6 +4,8 @@ public enum CLICommand: Equatable, Sendable {
     case gui
     case status
     case json
+    case history
+    case exportHistory
     case help
     case unknown(String)
 }
@@ -20,6 +22,10 @@ public enum CLIArguments {
             return .status
         case "--json", "-j":
             return .json
+        case "--history":
+            return .history
+        case "--export-history":
+            return .exportHistory
         case "--help", "-h":
             return .help
         default:
@@ -196,6 +202,82 @@ public enum CLIFormatter {
         return string
     }
 
+    private static let historyDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return f
+    }()
+
+    public static func formatHistoryTable(
+        records: [QuotaHistorySample],
+        limit: Int? = 50,
+        isRussian: Bool = Localization.isRussian
+    ) -> String {
+        guard !records.isEmpty else {
+            return Localization.historyEmpty(isRussian: isRussian)
+        }
+
+        let slice = limit != nil && records.count > limit! ? Array(records.suffix(limit!)) : records
+
+        let colDateTitle = Localization.historyTableHeaderDate(isRussian: isRussian)
+        let colGeminiTitle = Localization.historyTableHeaderGemini(isRussian: isRussian)
+        let colClaudeTitle = Localization.historyTableHeaderClaude(isRussian: isRussian)
+
+        // Column widths: Date: 21, Gemini: 14, Claude: 14
+        let wDate = 21
+        let wGemini = 14
+        let wClaude = 14
+
+        let topBorder = "┌" + String(repeating: "─", count: wDate) + "┬" + String(repeating: "─", count: wGemini) + "┬" + String(repeating: "─", count: wClaude) + "┐"
+        let sepBorder = "├" + String(repeating: "─", count: wDate) + "┼" + String(repeating: "─", count: wGemini) + "┼" + String(repeating: "─", count: wClaude) + "┤"
+        let bottomBorder = "└" + String(repeating: "─", count: wDate) + "┴" + String(repeating: "─", count: wGemini) + "┴" + String(repeating: "─", count: wClaude) + "┘"
+
+        func centerPad(_ text: String, width: Int) -> String {
+            if text.count >= width { return text }
+            let totalPad = width - text.count
+            let leftPad = totalPad / 2
+            let rightPad = totalPad - leftPad
+            return String(repeating: " ", count: leftPad) + text + String(repeating: " ", count: rightPad)
+        }
+
+        func rightPad(_ text: String, width: Int) -> String {
+            if text.count >= width { return text }
+            return String(repeating: " ", count: width - text.count) + text
+        }
+
+        func leftPad(_ text: String, width: Int) -> String {
+            if text.count >= width { return text }
+            return text + String(repeating: " ", count: width - text.count)
+        }
+
+        let headerRow = "│" + centerPad(colDateTitle, width: wDate) + "│" + centerPad(colGeminiTitle, width: wGemini) + "│" + centerPad(colClaudeTitle, width: wClaude) + "│"
+
+        var lines: [String] = [topBorder, headerRow, sepBorder]
+
+        for sample in slice {
+            let dateStr = " " + historyDateFormatter.string(from: sample.timestamp)
+            let gStr = (sample.geminiPercentage != nil ? String(format: "%.1f%%", sample.geminiPercentage!) : "—") + "  "
+            let cStr = (sample.claudePercentage != nil ? String(format: "%.1f%%", sample.claudePercentage!) : "—") + "  "
+
+            let row = "│" + leftPad(dateStr, width: wDate) + "│" + rightPad(gStr, width: wGemini) + "│" + rightPad(cStr, width: wClaude) + "│"
+            lines.append(row)
+        }
+
+        lines.append(bottomBorder)
+        return lines.joined(separator: "\n")
+    }
+
+    public static func formatHistoryJSON(records: [QuotaHistorySample]) throws -> String {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(records)
+        guard let string = String(data: data, encoding: .utf8) else {
+            throw URLError(.cannotDecodeContentData)
+        }
+        return string
+    }
+
     public static func helpMessage() -> String {
         """
         AntigravityQuota - Real-time model quota monitor for Google Antigravity
@@ -205,9 +287,11 @@ public enum CLIFormatter {
           antigravity-quota [option]
 
         Options:
-          --status, -s    Print compact single-line quota status (e.g. G 85.4% (1ч 12м) · C 100.0%)
-          --json, -j      Print complete quota snapshot as formatted JSON
-          -h, --help      Display this help information
+          --status, -s        Print compact single-line quota status (e.g. G 85.4% (1ч 12м) · C 100.0%)
+          --json, -j          Print complete quota snapshot as formatted JSON
+          --history           Print table of recent quota measurements from disk history
+          --export-history    Export entire quota measurement history as JSON
+          -h, --help          Display this help information
 
         Integrations:
           SketchyBar:

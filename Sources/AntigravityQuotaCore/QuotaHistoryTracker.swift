@@ -63,7 +63,7 @@ public struct QuotaBurnRate: Equatable, Sendable {
     }
 }
 
-public struct QuotaHistorySample: Equatable, Sendable {
+public struct QuotaHistorySample: Codable, Equatable, Sendable {
     public let timestamp: Date
     public let geminiPercentage: Double?
     public let claudePercentage: Double?
@@ -73,24 +73,182 @@ public struct QuotaHistorySample: Equatable, Sendable {
         self.geminiPercentage = geminiPercentage
         self.claudePercentage = claudePercentage
     }
+
+    enum CodingKeys: String, CodingKey {
+        case timestamp
+        case geminiPercentage
+        case claudePercentage
+        case gemini
+        case claude
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.timestamp = try container.decode(Date.self, forKey: .timestamp)
+        if let g = try container.decodeIfPresent(Double.self, forKey: .geminiPercentage) {
+            self.geminiPercentage = g
+        } else {
+            self.geminiPercentage = try container.decodeIfPresent(Double.self, forKey: .gemini)
+        }
+        if let c = try container.decodeIfPresent(Double.self, forKey: .claudePercentage) {
+            self.claudePercentage = c
+        } else {
+            self.claudePercentage = try container.decodeIfPresent(Double.self, forKey: .claude)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(timestamp, forKey: .timestamp)
+        try container.encodeIfPresent(geminiPercentage, forKey: .geminiPercentage)
+        try container.encodeIfPresent(claudePercentage, forKey: .claudePercentage)
+    }
 }
 
+public typealias QuotaHistoryRecord = QuotaHistorySample
+
 public final class QuotaHistoryTracker: @unchecked Sendable {
-    public static let shared = QuotaHistoryTracker()
+    public static var defaultStorageURL: URL {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: ("~/Library/Application Support" as NSString).expandingTildeInPath)
+        return appSupport
+            .appendingPathComponent("AntigravityQuota", isDirectory: true)
+            .appendingPathComponent("history.jsonl", isDirectory: false)
+    }
+
+    public static let shared = QuotaHistoryTracker(storageURL: defaultStorageURL)
 
     public let windowDuration: TimeInterval
+    public let storageURL: URL?
+    public let maxRetentionDays: Int
+
     private var samples: [QuotaHistorySample] = []
     private let lock = NSLock()
+    private let diskQueue = DispatchQueue(label: "com.fuheshka.AntigravityQuota.history-disk", qos: .utility)
 
-    public init(windowDuration: TimeInterval = 3600.0) {
+    public init(
+        windowDuration: TimeInterval = 3600.0,
+        storageURL: URL? = nil,
+        maxRetentionDays: Int = 7,
+        startDate: Date = Date()
+    ) {
         self.windowDuration = windowDuration
+        self.storageURL = storageURL
+        self.maxRetentionDays = maxRetentionDays
+
+        if let url = storageURL, FileManager.default.fileExists(atPath: url.path) {
+            _ = diskQueue.sync {
+                self.rotateHistoryDirect(now: startDate, retentionDays: maxRetentionDays, url: url)
+            }
+            let cutoff = startDate.addingTimeInterval(-windowDuration)
+            let loaded = loadHistoryRecords().filter { $0.timestamp >= cutoff }
+            self.samples = loaded
+        }
     }
 
     public func record(gemini: Double?, claude: Double?, at date: Date = Date()) {
+        let sample = QuotaHistorySample(timestamp: date, geminiPercentage: gemini, claudePercentage: claude)
         lock.lock()
-        defer { lock.unlock() }
-        samples.append(QuotaHistorySample(timestamp: date, geminiPercentage: gemini, claudePercentage: claude))
+        samples.append(sample)
         pruneInternal(now: date)
+        lock.unlock()
+
+        if storageURL != nil {
+            diskQueue.async { [weak self] in
+                self?.appendSampleToDisk(sample)
+            }
+        }
+    }
+
+    public func flushDiskQueue() {
+        diskQueue.sync {}
+    }
+
+    private func appendSampleToDisk(_ sample: QuotaHistorySample) {
+        guard let url = storageURL else { return }
+        do {
+            let dir = url.deletingLastPathComponent()
+            if !FileManager.default.fileExists(atPath: dir.path) {
+                try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            }
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            var data = try encoder.encode(sample)
+            data.append(UInt8(ascii: "\n"))
+
+            if FileManager.default.fileExists(atPath: url.path) {
+                let fileHandle = try FileHandle(forWritingTo: url)
+                defer { try? fileHandle.close() }
+                try fileHandle.seekToEnd()
+                try fileHandle.write(contentsOf: data)
+            } else {
+                try data.write(to: url, options: .atomic)
+            }
+        } catch {
+            // Silently ignore disk write error to avoid failing foreground flows
+        }
+    }
+
+    public func loadHistoryRecords() -> [QuotaHistorySample] {
+        guard let url = storageURL else { return [] }
+        return diskQueue.sync {
+            self.loadHistoryRecordsDirect(from: url)
+        }
+    }
+
+    private func loadHistoryRecordsDirect(from url: URL) -> [QuotaHistorySample] {
+        guard FileManager.default.fileExists(atPath: url.path),
+              let content = try? String(contentsOf: url, encoding: .utf8) else {
+            return []
+        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        var records: [QuotaHistorySample] = []
+        let lines = content.components(separatedBy: "\n")
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, let lineData = trimmed.data(using: .utf8) else { continue }
+            if let sample = try? decoder.decode(QuotaHistorySample.self, from: lineData) {
+                records.append(sample)
+            }
+        }
+        return records
+    }
+
+    @discardableResult
+    public func rotateHistory(now: Date = Date(), retentionDays: Int? = nil) -> Int {
+        guard let url = storageURL else { return 0 }
+        let days = retentionDays ?? maxRetentionDays
+        return diskQueue.sync {
+            self.rotateHistoryDirect(now: now, retentionDays: days, url: url)
+        }
+    }
+
+    private func rotateHistoryDirect(now: Date, retentionDays: Int, url: URL) -> Int {
+        guard FileManager.default.fileExists(atPath: url.path) else { return 0 }
+        let existing = loadHistoryRecordsDirect(from: url)
+        let cutoff = now.addingTimeInterval(-Double(retentionDays) * 86400.0)
+        let retained = existing.filter { $0.timestamp >= cutoff }
+        let prunedCount = existing.count - retained.count
+
+        if prunedCount > 0 {
+            rewriteHistoryFileDirect(records: retained, to: url)
+        }
+        return prunedCount
+    }
+
+    private func rewriteHistoryFileDirect(records: [QuotaHistorySample], to url: URL) {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        var buffer = ""
+        for record in records {
+            if let data = try? encoder.encode(record), let line = String(data: data, encoding: .utf8) {
+                buffer.append(line)
+                buffer.append("\n")
+            }
+        }
+        try? buffer.write(to: url, atomically: true, encoding: .utf8)
     }
 
     public func record(snapshot: QuotaSnapshot, at date: Date = Date()) {
