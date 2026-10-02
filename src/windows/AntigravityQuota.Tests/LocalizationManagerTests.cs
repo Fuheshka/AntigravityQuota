@@ -34,6 +34,14 @@ public class LocalizationManagerTests
         Assert.Equal("Лимит 5ч", loc.FiveHourLimit);
         Assert.Equal("Недельный", loc.WeeklyLimit);
         Assert.Equal("Автор: Даниил К. (Fuheshka)", loc.AboutAuthor);
+        Assert.Equal("Запускать при старте Windows", loc.MenuLaunchAtStartup);
+        Assert.Equal("Проверить обновления...", loc.MenuCheckUpdates);
+        Assert.Equal("Доступно обновление", loc.UpdateDialogTitleAvailable);
+        Assert.Equal("Обновлений не найдено", loc.UpdateDialogTitleUpToDate);
+        Assert.Equal("Ошибка проверки обновлений", loc.UpdateDialogTitleFailed);
+        Assert.Contains("1.2.0", loc.FormatUpdateAvailableMessage("1.2.0"));
+        Assert.Contains("1.0.0", loc.FormatUpToDateMessage("1.0.0"));
+        Assert.False(string.IsNullOrWhiteSpace(loc.UpdateDialogFailedMessage));
     }
 
     [Fact]
@@ -65,6 +73,14 @@ public class LocalizationManagerTests
         Assert.Equal("5h Limit", loc.FiveHourLimit);
         Assert.Equal("Weekly", loc.WeeklyLimit);
         Assert.Equal("Created by Daniil K. (Fuheshka)", loc.AboutAuthor);
+        Assert.Equal("Launch at Windows startup", loc.MenuLaunchAtStartup);
+        Assert.Equal("Check for Updates...", loc.MenuCheckUpdates);
+        Assert.Equal("Update Available", loc.UpdateDialogTitleAvailable);
+        Assert.Equal("You're Up to Date", loc.UpdateDialogTitleUpToDate);
+        Assert.Equal("Update Check Failed", loc.UpdateDialogTitleFailed);
+        Assert.Contains("1.2.0", loc.FormatUpdateAvailableMessage("1.2.0"));
+        Assert.Contains("1.0.0", loc.FormatUpToDateMessage("1.0.0"));
+        Assert.False(string.IsNullOrWhiteSpace(loc.UpdateDialogFailedMessage));
     }
 
     [Theory]

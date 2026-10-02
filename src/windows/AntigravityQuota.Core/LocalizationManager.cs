@@ -84,6 +84,20 @@ public class LocalizationManager
         ? "• Alt + ЛКМ - перемещение HUD в режиме сквозного клика"
         : "• Alt + Left Click - drag HUD in click-through mode";
     public string AboutCheckUpdates => IsRussian ? "Проверить обновления..." : "Check for Updates...";
+    public string MenuLaunchAtStartup => IsRussian ? "Запускать при старте Windows" : "Launch at Windows startup";
+    public string MenuCheckUpdates => IsRussian ? "Проверить обновления..." : "Check for Updates...";
+    public string UpdateDialogTitleAvailable => IsRussian ? "Доступно обновление" : "Update Available";
+    public string UpdateDialogTitleUpToDate => IsRussian ? "Обновлений не найдено" : "You're Up to Date";
+    public string UpdateDialogTitleFailed => IsRussian ? "Ошибка проверки обновлений" : "Update Check Failed";
+    public string FormatUpdateAvailableMessage(string newVersion) => IsRussian 
+        ? $"Доступна новая версия {newVersion}. Хотите перейти к скачиванию?" 
+        : $"A new version {newVersion} is available. Download now?";
+    public string FormatUpToDateMessage(string currentVersion) => IsRussian 
+        ? $"У вас установлена самая свежая версия ({currentVersion})." 
+        : $"You are running the latest version ({currentVersion}).";
+    public string UpdateDialogFailedMessage => IsRussian 
+        ? "Не удалось проверить наличие обновлений. Попробуйте позже." 
+        : "Failed to check for updates. Please try again later.";
 
     public string AboutTitle => IsRussian ? "О программе AntigravityQuota" : "About AntigravityQuota";
     public string AboutConnectionStatus => IsRussian ? "Статус соединения" : "Connection status";

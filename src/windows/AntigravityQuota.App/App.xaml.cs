@@ -29,6 +29,8 @@ public partial class App : Application
     private QuotaClient? _client;
     private QuotaHistoryTracker? _history;
     private AdaptivePollingManager? _pollingManager;
+    private StartupManager? _startupManager;
+    private UpdateChecker? _updateChecker;
     private CancellationTokenSource? _cts;
 
     public static void RecordFlyoutDeactivation()
@@ -41,6 +43,8 @@ public partial class App : Application
         base.OnStartup(e);
 
         var loc = LocalizationManager.Instance;
+        _startupManager = new StartupManager();
+        _updateChecker = new UpdateChecker();
         _client = new QuotaClient();
         _history = new QuotaHistoryTracker();
         _pollingManager = new AdaptivePollingManager();
@@ -168,6 +172,9 @@ public partial class App : Application
 
         // 5. Start background polling loop
         _ = RunPollingLoopAsync(_cts.Token);
+
+        // 6. Start silent background update check after 3 seconds (24h cooldown)
+        _ = RunBackgroundUpdateCheckAsync(_cts.Token);
     }
 
     private void SetupNotifyIcon(LocalizationManager loc)
@@ -318,7 +325,31 @@ public partial class App : Application
 
         contextMenu.Items.Add(new Separator());
 
-        // 6. Обновить квоты
+        // 6. Запускать при старте Windows (Checkable)
+        var startupItem = new MenuItem
+        {
+            Header = loc.MenuLaunchAtStartup,
+            IsCheckable = true,
+            IsChecked = _startupManager?.IsEnabled() ?? false
+        };
+        startupItem.Click += (s, e) =>
+        {
+            if (_startupManager != null)
+            {
+                bool newState = startupItem.IsChecked;
+                bool success = _startupManager.SetEnabled(newState);
+                if (!success)
+                {
+                    // Revert checkbox state if registry write failed
+                    startupItem.IsChecked = _startupManager.IsEnabled();
+                }
+            }
+        };
+        contextMenu.Items.Add(startupItem);
+
+        contextMenu.Items.Add(new Separator());
+
+        // 7. Обновить квоты
         var refreshItem = new MenuItem
         {
             Header = loc.MenuRefreshNow,
@@ -332,6 +363,17 @@ public partial class App : Application
             }
         };
         contextMenu.Items.Add(refreshItem);
+
+        // 8. Проверить обновления...
+        var updateItem = new MenuItem
+        {
+            Header = loc.MenuCheckUpdates
+        };
+        updateItem.Click += async (s, e) =>
+        {
+            await CheckForUpdatesManualAsync();
+        };
+        contextMenu.Items.Add(updateItem);
 
         // 4. Настройки
         var settingsItem = new MenuItem
@@ -455,11 +497,110 @@ public partial class App : Application
         }
     }
 
+    private async Task RunBackgroundUpdateCheckAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
+            if (cancellationToken.IsCancellationRequested || _updateChecker == null) return;
+
+            var result = await _updateChecker.CheckForUpdatesAsync(force: false, cancellationToken);
+            if (result.IsUpdateAvailable && !string.IsNullOrWhiteSpace(result.LatestVersion))
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    PromptUpdateAvailable(result);
+                });
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected on application shutdown
+        }
+        catch (Exception ex)
+        {
+            // Fail silently in background
+            Debug.WriteLine($"[UpdateChecker Background Error]: {ex.Message}");
+        }
+    }
+
+    public async Task CheckForUpdatesManualAsync()
+    {
+        if (_updateChecker == null) return;
+
+        try
+        {
+            var result = await _updateChecker.CheckForUpdatesAsync(force: true);
+            Dispatcher.Invoke(() =>
+            {
+                var loc = LocalizationManager.Instance;
+                if (result.IsUpdateAvailable && !string.IsNullOrWhiteSpace(result.LatestVersion))
+                {
+                    PromptUpdateAvailable(result);
+                }
+                else if (result.IsUpToDate)
+                {
+                    MessageBox.Show(
+                        loc.FormatUpToDateMessage(result.CurrentVersion),
+                        loc.UpdateDialogTitleUpToDate,
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                }
+                else
+                {
+                    MessageBox.Show(
+                        loc.UpdateDialogFailedMessage,
+                        loc.UpdateDialogTitleFailed,
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                }
+            });
+        }
+        catch
+        {
+            var loc = LocalizationManager.Instance;
+            MessageBox.Show(
+                loc.UpdateDialogFailedMessage,
+                loc.UpdateDialogTitleFailed,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private void PromptUpdateAvailable(UpdateCheckResult result)
+    {
+        var loc = LocalizationManager.Instance;
+        var newVer = result.LatestVersion ?? "Unknown";
+        var message = loc.FormatUpdateAvailableMessage(newVer);
+        var res = MessageBox.Show(
+            message,
+            loc.UpdateDialogTitleAvailable,
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Information);
+
+        if (res == MessageBoxResult.Yes)
+        {
+            string url = !string.IsNullOrWhiteSpace(result.DownloadUrl)
+                ? result.DownloadUrl
+                : (!string.IsNullOrWhiteSpace(result.ReleasePageUrl) ? result.ReleasePageUrl : "https://github.com/Fuheshka/AntigravityQuota/releases");
+
+            try
+            {
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[UpdateChecker Open Browser Error]: {ex.Message}");
+            }
+        }
+    }
+
     private void ShutdownApp()
     {
         _cts?.Cancel();
         _hotkeyManager?.Dispose();
         _tracker?.Dispose();
+        _updateChecker?.Dispose();
         _notifyIcon?.Unregister();
         _flyout?.Close();
         _hudWindow?.Close();
@@ -472,6 +613,7 @@ public partial class App : Application
         _cts?.Cancel();
         _hotkeyManager?.Dispose();
         _tracker?.Dispose();
+        _updateChecker?.Dispose();
         _notifyIcon?.Unregister();
         _hudWindow?.Close();
         _aboutWindow?.Close();
