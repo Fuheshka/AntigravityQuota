@@ -1,0 +1,446 @@
+using System.Diagnostics;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Interop;
+using System.Windows.Media.Imaging;
+using AntigravityQuota.App.Views;
+using AntigravityQuota.Core.ViewModels;
+using AntigravityQuota.Core;
+using Wpf.Ui.Tray.Controls;
+
+namespace AntigravityQuota.App;
+
+public partial class App : Application
+{
+    private static readonly DebounceGate DebounceGate = new(TimeSpan.FromMilliseconds(250));
+
+    private FlyoutWindow? _flyout;
+    private FlyoutViewModel? _viewModel;
+    private QuotaHudWindow? _hudWindow;
+    private HudViewModel? _hudViewModel;
+    private WindowContextTracker? _tracker;
+    private GlobalHotkeyManager? _hotkeyManager;
+    private NotifyIcon? _notifyIcon;
+
+    private QuotaClient? _client;
+    private QuotaHistoryTracker? _history;
+    private AdaptivePollingManager? _pollingManager;
+    private CancellationTokenSource? _cts;
+
+    public static void RecordFlyoutDeactivation()
+    {
+        DebounceGate.RecordDeactivation();
+    }
+
+    protected override async void OnStartup(StartupEventArgs e)
+    {
+        base.OnStartup(e);
+
+        var loc = LocalizationManager.Instance;
+        _client = new QuotaClient();
+        _history = new QuotaHistoryTracker();
+        _pollingManager = new AdaptivePollingManager();
+        _cts = new CancellationTokenSource();
+
+        Func<Task> triggerRefresh = async () =>
+        {
+            if (_pollingManager != null && _client != null)
+            {
+                await _pollingManager.TriggerImmediatePollAsync(async ct =>
+                {
+                    var snap = await _client.FetchSnapshotAsync(forceRefresh: true, ct);
+                    Dispatcher.Invoke(() =>
+                    {
+                        _viewModel?.UpdateFromSnapshot(snap);
+                        _hudViewModel?.UpdateFromSnapshot(snap);
+                        if (_notifyIcon != null && _viewModel != null)
+                        {
+                            _notifyIcon.TooltipText = _viewModel.TrayTooltipText;
+                        }
+                    });
+                });
+            }
+        };
+
+        // 1. Initialize Flyout ViewModel
+        _viewModel = new FlyoutViewModel(
+            client: _client,
+            history: _history,
+            loc: loc,
+            triggerRefreshCallback: triggerRefresh);
+
+        // 2. Initialize HUD ViewModel, Window Context Tracker and Window
+        var hudSettings = HudSettingsManager.Load();
+        _hudViewModel = new HudViewModel(
+            settings: hudSettings,
+            client: _client,
+            history: _history,
+            loc: loc,
+            triggerRefreshCallback: triggerRefresh);
+
+        _hotkeyManager = new GlobalHotkeyManager
+        {
+            IsEnabled = hudSettings.HotkeysEnabled,
+            OnToggleHud = () =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    if (_hudWindow != null && _hudViewModel != null)
+                    {
+                        if (_hudViewModel.IsEnabled)
+                        {
+                            _hudWindow.HideHud();
+                        }
+                        else
+                        {
+                            _hudWindow.ShowHud();
+                        }
+                    }
+                });
+            },
+            OnTogglePillMode = () =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    if (_hudViewModel != null && _hudWindow != null)
+                    {
+                        if (!_hudViewModel.IsEnabled)
+                        {
+                            _hudWindow.ShowHud();
+                        }
+                        _hudViewModel.IsPillMode = !_hudViewModel.IsPillMode;
+                    }
+                });
+            },
+            OnRefreshQuotas = () =>
+            {
+                Dispatcher.Invoke(async () =>
+                {
+                    if (_viewModel != null)
+                    {
+                        await _viewModel.RefreshAsync();
+                    }
+                });
+            }
+        };
+
+        _tracker = new WindowContextTracker(autoHideEnabled: hudSettings.AutoHideEnabled);
+        _hudWindow = new QuotaHudWindow(_hudViewModel, _tracker, _hotkeyManager);
+
+        // Ensure HWND is created so HwndSource and global hotkeys are registered even if HUD is initially hidden
+        new WindowInteropHelper(_hudWindow).EnsureHandle();
+
+        if (hudSettings.IsEnabled)
+        {
+            _hudWindow.ShowHud();
+        }
+
+        // 3. Initialize FlyoutWindow (hidden by default)
+        _flyout = new FlyoutWindow(_viewModel);
+
+        // 4. Initialize System Tray Icon
+        SetupNotifyIcon(loc);
+
+        // 5. Start background polling loop
+        _ = RunPollingLoopAsync(_cts.Token);
+    }
+
+    private void SetupNotifyIcon(LocalizationManager loc)
+    {
+        _notifyIcon = new NotifyIcon
+        {
+            FocusOnLeftClick = true,
+            MenuOnRightClick = true,
+            TooltipText = _viewModel?.TrayTooltipText ?? "AntigravityQuota"
+        };
+
+        try
+        {
+            var iconUri = new Uri("pack://application:,,,/Assets/app-icon.ico", UriKind.Absolute);
+            _notifyIcon.Icon = BitmapFrame.Create(iconUri);
+        }
+        catch
+        {
+            // Fallback if ico resource fails to load
+        }
+
+        // Left click on tray toggles the FlyoutWindow
+#pragma warning disable CS8622
+        _notifyIcon.LeftClick += (s, e) => ToggleFlyout();
+#pragma warning restore CS8622
+
+        // Context menu on right click
+        var contextMenu = new ContextMenu();
+
+        // 1. Включить HUD (Checkable)
+        var hudItem = new MenuItem
+        {
+            Header = loc.MenuEnableHUD,
+            InputGestureText = loc.HotkeyHintToggleHud,
+            IsCheckable = true,
+            IsChecked = _hudViewModel?.IsEnabled ?? true
+        };
+        hudItem.Click += (s, e) =>
+        {
+            if (_hudWindow != null && _hudViewModel != null)
+            {
+                if (hudItem.IsChecked)
+                {
+                    _hudWindow.ShowHud();
+                }
+                else
+                {
+                    _hudWindow.HideHud();
+                }
+            }
+        };
+        contextMenu.Items.Add(hudItem);
+
+        // 2. Режим таблетки (Checkable)
+        var pillItem = new MenuItem
+        {
+            Header = loc.MenuCompactPillMode,
+            InputGestureText = loc.HotkeyHintTogglePill,
+            IsCheckable = true,
+            IsChecked = _hudViewModel?.IsPillMode ?? false
+        };
+        pillItem.Click += (s, e) =>
+        {
+            if (_hudViewModel != null)
+            {
+                _hudViewModel.IsPillMode = pillItem.IsChecked;
+            }
+        };
+        contextMenu.Items.Add(pillItem);
+
+        // 3. Автоскрытие HUD (Checkable)
+        var autoHideItem = new MenuItem
+        {
+            Header = loc.MenuAutoHideHUD,
+            IsCheckable = true,
+            IsChecked = _hudViewModel?.AutoHideEnabled ?? true
+        };
+        autoHideItem.Click += (s, e) =>
+        {
+            if (_hudViewModel != null)
+            {
+                _hudViewModel.AutoHideEnabled = autoHideItem.IsChecked;
+            }
+        };
+        contextMenu.Items.Add(autoHideItem);
+
+        // 4. Сквозной клик (Checkable)
+        var clickThroughItem = new MenuItem
+        {
+            Header = loc.MenuClickThrough,
+            IsCheckable = true,
+            IsChecked = _hudViewModel?.ClickThroughEnabled ?? true
+        };
+        clickThroughItem.Click += (s, e) =>
+        {
+            if (_hudViewModel != null)
+            {
+                _hudViewModel.ClickThroughEnabled = clickThroughItem.IsChecked;
+            }
+        };
+        contextMenu.Items.Add(clickThroughItem);
+
+        // 5. Глобальные горячие клавиши (Checkable)
+        var hotkeysItem = new MenuItem
+        {
+            Header = loc.MenuGlobalHotkeys,
+            IsCheckable = true,
+            IsChecked = _hudViewModel?.HotkeysEnabled ?? true
+        };
+        hotkeysItem.Click += (s, e) =>
+        {
+            if (_hudViewModel != null)
+            {
+                _hudViewModel.HotkeysEnabled = hotkeysItem.IsChecked;
+            }
+        };
+        contextMenu.Items.Add(hotkeysItem);
+
+        if (_hudViewModel != null)
+        {
+            _hudViewModel.PropertyChanged += (s, e) =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    if (e.PropertyName == nameof(HudViewModel.IsPillMode))
+                    {
+                        pillItem.IsChecked = _hudViewModel.IsPillMode;
+                    }
+                    else if (e.PropertyName == nameof(HudViewModel.IsEnabled))
+                    {
+                        hudItem.IsChecked = _hudViewModel.IsEnabled;
+                    }
+                    else if (e.PropertyName == nameof(HudViewModel.AutoHideEnabled))
+                    {
+                        autoHideItem.IsChecked = _hudViewModel.AutoHideEnabled;
+                    }
+                    else if (e.PropertyName == nameof(HudViewModel.ClickThroughEnabled))
+                    {
+                        clickThroughItem.IsChecked = _hudViewModel.ClickThroughEnabled;
+                    }
+                    else if (e.PropertyName == nameof(HudViewModel.HotkeysEnabled))
+                    {
+                        hotkeysItem.IsChecked = _hudViewModel.HotkeysEnabled;
+                    }
+                });
+            };
+        }
+
+        contextMenu.Items.Add(new Separator());
+
+        // 6. Обновить квоты
+        var refreshItem = new MenuItem
+        {
+            Header = loc.MenuRefreshNow,
+            InputGestureText = loc.HotkeyHintRefresh
+        };
+        refreshItem.Click += async (s, e) =>
+        {
+            if (_viewModel != null)
+            {
+                await _viewModel.RefreshAsync();
+            }
+        };
+        contextMenu.Items.Add(refreshItem);
+
+        // 4. Настройки
+        var settingsItem = new MenuItem
+        {
+            Header = loc.MenuSettings
+        };
+        settingsItem.Click += (s, e) =>
+        {
+            ToggleFlyout();
+        };
+        contextMenu.Items.Add(settingsItem);
+
+        // 5. О программе
+        var aboutItem = new MenuItem
+        {
+            Header = loc.MenuAbout
+        };
+        aboutItem.Click += (s, e) =>
+        {
+            ShowAboutDialog(loc);
+        };
+        contextMenu.Items.Add(aboutItem);
+
+        contextMenu.Items.Add(new Separator());
+
+        // 6. Выход
+        var exitItem = new MenuItem
+        {
+            Header = loc.MenuExit
+        };
+        exitItem.Click += (s, e) =>
+        {
+            ShutdownApp();
+        };
+        contextMenu.Items.Add(exitItem);
+
+        _notifyIcon.Menu = contextMenu;
+        _notifyIcon.Register();
+    }
+
+    public void ToggleFlyout()
+    {
+        if (_flyout == null) return;
+
+        // Prevent toggle-flicker race condition
+        if (!DebounceGate.CanToggle())
+        {
+            return;
+        }
+
+        if (_flyout.IsVisible)
+        {
+            _flyout.Hide();
+        }
+        else
+        {
+            _flyout.ShowFlyout();
+        }
+    }
+
+    private async Task RunPollingLoopAsync(CancellationToken cancellationToken)
+    {
+        if (_pollingManager == null || _client == null) return;
+
+        try
+        {
+            await _pollingManager.RunAsync(async ct =>
+            {
+                try
+                {
+                    var snapshot = await _client.FetchSnapshotAsync(forceRefresh: false, ct);
+                    Dispatcher.Invoke(() =>
+                    {
+                        _viewModel?.UpdateFromSnapshot(snapshot);
+                        _hudViewModel?.UpdateFromSnapshot(snapshot);
+                        if (_notifyIcon != null && _viewModel != null)
+                        {
+                            _notifyIcon.TooltipText = _viewModel.TrayTooltipText;
+                        }
+                    });
+                }
+                catch (OperationCanceledException)
+                {
+                    // Clean cancellation
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[Polling Error]: {ex.Message}");
+                }
+            }, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected on application shutdown
+        }
+    }
+
+    private void ShowAboutDialog(LocalizationManager loc)
+    {
+        var aboutMessage = $"{loc.AppTitle}\n\n" +
+                           $"{loc.AboutDescription}\n\n" +
+                           $"{loc.AboutHotkeysTitle}\n" +
+                           $"{loc.AboutHotkeyToggleHud}\n" +
+                           $"{loc.AboutHotkeyTogglePill}\n" +
+                           $"{loc.AboutHotkeyRefresh}\n\n" +
+                           $"{loc.AboutAuthor}\n" +
+                           $"GitHub: https://github.com/Fuheshka/AntigravityQuota\n\n" +
+                           $"Copyright © 2026 Daniil K. (Fuheshka). All rights reserved.";
+
+        MessageBox.Show(
+            aboutMessage,
+            loc.MenuAbout.Replace("...", ""),
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
+    }
+
+    private void ShutdownApp()
+    {
+        _cts?.Cancel();
+        _hotkeyManager?.Dispose();
+        _tracker?.Dispose();
+        _notifyIcon?.Unregister();
+        _flyout?.Close();
+        _hudWindow?.Close();
+        Current.Shutdown();
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        _cts?.Cancel();
+        _hotkeyManager?.Dispose();
+        _tracker?.Dispose();
+        _notifyIcon?.Unregister();
+        _hudWindow?.Close();
+        base.OnExit(e);
+    }
+}

@@ -10,6 +10,7 @@ public record QuotaBucket
     public DateTimeOffset? ResetTime { get; init; }
 
     public double Percentage => Math.Clamp(RemainingFraction * 100.0, 0.0, 100.0);
+    public TimeSpan? TimeUntilReset => ResetTime.HasValue ? (ResetTime.Value > DateTimeOffset.UtcNow ? ResetTime.Value - DateTimeOffset.UtcNow : TimeSpan.Zero) : null;
 
     public QuotaBucket(string bucketId, string window, double remainingFraction, DateTimeOffset? resetTime)
     {

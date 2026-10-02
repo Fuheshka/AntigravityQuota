@@ -4,7 +4,9 @@
 xcuserdata/
 DerivedData/
 .swiftpm/
-*.app
+/*.app
+!src/windows/AntigravityQuota.App/
+!src/windows/AntigravityQuota.App/**
 *.dmg
 *.zip
 dist/

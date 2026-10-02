@@ -1,0 +1,493 @@
+<ui:FluentWindow
+    x:Class="AntigravityQuota.App.Views.QuotaHudWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:vm="clr-namespace:AntigravityQuota.Core.ViewModels;assembly=AntigravityQuota.Core"
+    mc:Ignorable="d"
+    Title="AntigravityQuota HUD"
+    WindowStyle="None"
+    ResizeMode="NoResize"
+    ShowInTaskbar="False"
+    Topmost="True"
+    WindowBackdropType="Mica"
+    WindowCornerPreference="Round"
+    ExtendsContentIntoTitleBar="True"
+    Background="Transparent"
+    Foreground="#F3F3F3"
+    d:DataContext="{d:DesignInstance vm:HudViewModel}">
+
+    <Grid x:Name="RootContainer" MouseLeftButtonDown="OnRootMouseLeftButtonDown">
+        <!-- 1. COMPACT PILL MODE (Capsule HUD) -->
+        <Border
+            x:Name="PillView"
+            CornerRadius="19"
+            Background="#E618181B"
+            BorderBrush="#3E3E44"
+            BorderThickness="1"
+            Padding="12,5,10,5"
+            Cursor="SizeAll">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsPillMode}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+
+            <Grid VerticalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Gemini Dot -->
+                <Ellipse
+                    Grid.Column="0"
+                    Width="7"
+                    Height="7"
+                    Fill="{Binding PillGeminiColor}"
+                    Margin="0,0,6,0"
+                    VerticalAlignment="Center" />
+
+                <!-- Gemini Text (e.g. G 85% 1h 12m) -->
+                <TextBlock
+                    Grid.Column="1"
+                    Text="{Binding PillGeminiText}"
+                    FontSize="11.5"
+                    FontWeight="SemiBold"
+                    FontFamily="Consolas, Segoe UI, sans-serif"
+                    Foreground="#FFFFFF"
+                    VerticalAlignment="Center"
+                    Margin="0,0,6,0" />
+
+                <!-- Bullet Separator -->
+                <TextBlock
+                    Grid.Column="2"
+                    Text="·"
+                    FontSize="12"
+                    FontWeight="Bold"
+                    Foreground="#71717A"
+                    VerticalAlignment="Center"
+                    Margin="0,0,6,0" />
+
+                <!-- Claude Dot -->
+                <Ellipse
+                    Grid.Column="3"
+                    Width="7"
+                    Height="7"
+                    Fill="{Binding PillClaudeColor}"
+                    Margin="0,0,6,0"
+                    VerticalAlignment="Center" />
+
+                <!-- Claude Text (e.g. C 100%) -->
+                <TextBlock
+                    Grid.Column="4"
+                    Text="{Binding PillClaudeText}"
+                    FontSize="11.5"
+                    FontWeight="SemiBold"
+                    FontFamily="Consolas, Segoe UI, sans-serif"
+                    Foreground="#FFFFFF"
+                    VerticalAlignment="Center" />
+
+                <!-- Expand Button -->
+                <ui:Button
+                    Grid.Column="6"
+                    Command="{Binding TogglePillModeCommand}"
+                    Padding="4"
+                    Margin="8,0,0,0"
+                    Width="22"
+                    Height="22"
+                    Cursor="Hand"
+                    ToolTip="Развернуть карточку"
+                    VerticalAlignment="Center">
+                    <ui:SymbolIcon Symbol="FullScreenMaximize24" FontSize="11" Foreground="#D4D4D8" />
+                </ui:Button>
+            </Grid>
+        </Border>
+
+        <!-- 2. EXPANDED CARD MODE -->
+        <Border
+            x:Name="CardView"
+            CornerRadius="12"
+            Background="#F218181B"
+            BorderBrush="#2E2E33"
+            BorderThickness="1"
+            Padding="14,12,14,12"
+            Cursor="SizeAll">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsPillMode}" Value="False">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" /> <!-- Header -->
+                    <RowDefinition Height="Auto" /> <!-- Gemini -->
+                    <RowDefinition Height="Auto" /> <!-- Claude -->
+                    <RowDefinition Height="Auto" /> <!-- Sparkline -->
+                    <RowDefinition Height="Auto" /> <!-- Footer -->
+                </Grid.RowDefinitions>
+
+                <!-- Header -->
+                <Grid Grid.Row="0" Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Icon & Title -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Image Source="pack://application:,,,/Assets/app-icon.png" Width="18" Height="18" Margin="0,0,7,0" />
+                        <TextBlock Text="Antigravity Quota" FontWeight="SemiBold" FontSize="13" Foreground="#FFFFFF" VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <!-- Status Badge -->
+                    <Border
+                        Grid.Column="1"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Margin="0,0,6,0"
+                        Padding="7,2,7,2"
+                        Background="#27272A"
+                        BorderBrush="#3F3F46"
+                        BorderThickness="1"
+                        CornerRadius="4">
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse
+                                Width="5"
+                                Height="5"
+                                Margin="0,0,5,0"
+                                VerticalAlignment="Center"
+                                Fill="{Binding PillGeminiColor}" />
+                            <TextBlock Text="{Binding StatusBadgeText}" FontSize="10" Foreground="#D4D4D8" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Collapse to Pill Button -->
+                    <ui:Button
+                        Grid.Column="2"
+                        Command="{Binding TogglePillModeCommand}"
+                        Padding="4"
+                        Width="24"
+                        Height="24"
+                        Margin="0,0,4,0"
+                        Cursor="Hand"
+                        ToolTip="Свернуть в таблетку"
+                        VerticalAlignment="Center">
+                        <ui:SymbolIcon Symbol="Subtract24" FontSize="12" Foreground="#D4D4D8" />
+                    </ui:Button>
+
+                    <!-- Refresh Button with Spin -->
+                    <ui:Button
+                        Grid.Column="3"
+                        Command="{Binding RefreshCommand}"
+                        Padding="4"
+                        Width="24"
+                        Height="24"
+                        Cursor="Hand"
+                        ToolTip="{Binding Loc.MenuRefreshNow}"
+                        VerticalAlignment="Center">
+                        <ui:SymbolIcon Symbol="ArrowSync24" FontSize="13" RenderTransformOrigin="0.5,0.5">
+                            <ui:SymbolIcon.RenderTransform>
+                                <RotateTransform Angle="0" />
+                            </ui:SymbolIcon.RenderTransform>
+                            <ui:SymbolIcon.Style>
+                                <Style TargetType="ui:SymbolIcon">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsRefreshing}" Value="True">
+                                            <DataTrigger.EnterActions>
+                                                <BeginStoryboard x:Name="SpinStory">
+                                                    <Storyboard RepeatBehavior="Forever">
+                                                        <DoubleAnimation
+                                                            Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                            From="0"
+                                                            To="360"
+                                                            Duration="0:0:0.8" />
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </DataTrigger.EnterActions>
+                                            <DataTrigger.ExitActions>
+                                                <StopStoryboard BeginStoryboardName="SpinStory" />
+                                            </DataTrigger.ExitActions>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ui:SymbolIcon.Style>
+                        </ui:SymbolIcon>
+                    </ui:Button>
+                </Grid>
+
+                <!-- Gemini Section -->
+                <ui:Card Grid.Row="1" Margin="0,0,0,8" Padding="10">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Title & Percentage -->
+                        <Grid Grid.Row="0" Margin="0,0,0,6">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <ui:SymbolIcon Symbol="Bot24" Foreground="#60A5FA" Margin="0,0,5,0" FontSize="14" />
+                                <TextBlock Text="{Binding Loc.GeminiPoolTitle}" FontWeight="SemiBold" FontSize="12" Foreground="#F4F4F5" />
+                            </StackPanel>
+                            <TextBlock
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                FontWeight="Bold"
+                                FontSize="12"
+                                Foreground="{Binding GeminiBarColor}"
+                                Text="{Binding GeminiFiveHourPct, StringFormat='{}{0:F1}%'}" />
+                        </Grid>
+
+                        <!-- Progress Bar -->
+                        <ProgressBar
+                            Grid.Row="1"
+                            Height="5"
+                            Value="{Binding GeminiFiveHourPct, Mode=OneWay}"
+                            Maximum="100"
+                            Foreground="{Binding GeminiBarColor}"
+                            Background="#27272A"
+                            BorderThickness="0"
+                            Margin="0,0,0,6" />
+
+                        <!-- Timers: 5h and Weekly -->
+                        <Grid Grid.Row="2" Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="Timer20" FontSize="11" Foreground="#A1A1AA" Margin="0,0,3,0" />
+                                <TextBlock Text="{Binding GeminiCountdownText}" FontSize="10.5" Foreground="#E4E4E7" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" HorizontalAlignment="Right" Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="CalendarLtr20" FontSize="11" Foreground="#A1A1AA" Margin="0,0,3,0" />
+                                <TextBlock Text="{Binding GeminiWeeklyCountdownText}" FontSize="10.5" Foreground="#A1A1AA" />
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Burn Rate -->
+                        <StackPanel Grid.Row="3" Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="ArrowTrendingLines20" FontSize="11" Foreground="#93C5FD" Margin="0,0,4,0" />
+                            <TextBlock Text="{Binding GeminiBurnRateText}" FontSize="10" Foreground="#93C5FD" />
+                        </StackPanel>
+                    </Grid>
+                </ui:Card>
+
+                <!-- Claude Section -->
+                <ui:Card Grid.Row="2" Margin="0,0,0,8" Padding="10">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Title & Percentage -->
+                        <Grid Grid.Row="0" Margin="0,0,0,6">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <ui:SymbolIcon Symbol="BrainCircuit24" Foreground="#FB923C" Margin="0,0,5,0" FontSize="14" />
+                                <TextBlock Text="{Binding Loc.ClaudePoolTitle}" FontWeight="SemiBold" FontSize="12" Foreground="#F4F4F5" />
+                            </StackPanel>
+                            <TextBlock
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                FontWeight="Bold"
+                                FontSize="12"
+                                Foreground="{Binding ClaudeBarColor}"
+                                Text="{Binding ClaudeFiveHourPct, StringFormat='{}{0:F1}%'}" />
+                        </Grid>
+
+                        <!-- Progress Bar -->
+                        <ProgressBar
+                            Grid.Row="1"
+                            Height="5"
+                            Value="{Binding ClaudeFiveHourPct, Mode=OneWay}"
+                            Maximum="100"
+                            Foreground="{Binding ClaudeBarColor}"
+                            Background="#27272A"
+                            BorderThickness="0"
+                            Margin="0,0,0,6" />
+
+                        <!-- Timers: 5h and Weekly -->
+                        <Grid Grid.Row="2" Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="Timer20" FontSize="11" Foreground="#A1A1AA" Margin="0,0,3,0" />
+                                <TextBlock Text="{Binding ClaudeCountdownText}" FontSize="10.5" Foreground="#E4E4E7" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" HorizontalAlignment="Right" Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="CalendarLtr20" FontSize="11" Foreground="#A1A1AA" Margin="0,0,3,0" />
+                                <TextBlock Text="{Binding ClaudeWeeklyCountdownText}" FontSize="10.5" Foreground="#A1A1AA" />
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Burn Rate -->
+                        <StackPanel Grid.Row="3" Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="ArrowTrendingLines20" FontSize="11" Foreground="#FDBA74" Margin="0,0,4,0" />
+                            <TextBlock Text="{Binding ClaudeBurnRateText}" FontSize="10" Foreground="#FDBA74" />
+                        </StackPanel>
+                    </Grid>
+                </ui:Card>
+
+                <!-- Sparkline Section -->
+                <ui:Card Grid.Row="3" Margin="0,0,0,8" Padding="10">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Sparkline Header / Toggle -->
+                        <Grid Grid.Row="0">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <ui:SymbolIcon Symbol="DataArea24" FontSize="13" Foreground="#A1A1AA" Margin="0,0,4,0" />
+                                <TextBlock Text="{Binding Loc.SparklineTitle}" FontSize="11" FontWeight="SemiBold" Foreground="#E4E4E7" />
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                <Rectangle Width="7" Height="3" Fill="#3B82F6" Margin="0,0,3,0" RadiusX="1" RadiusY="1" />
+                                <TextBlock Text="G" FontSize="9.5" Foreground="#A1A1AA" Margin="0,0,6,0" />
+                                <Rectangle Width="7" Height="3" Fill="#F97316" Margin="0,0,3,0" RadiusX="1" RadiusY="1" />
+                                <TextBlock Text="C" FontSize="9.5" Foreground="#A1A1AA" Margin="0,0,6,0" />
+
+                                <ui:Button
+                                    Command="{Binding ToggleSparklineCommand}"
+                                    Padding="2"
+                                    Width="18"
+                                    Height="18"
+                                    Cursor="Hand"
+                                    ToolTip="График расхода"
+                                    VerticalAlignment="Center">
+                                    <ui:SymbolIcon Symbol="ChevronDown12" FontSize="9" Foreground="#A1A1AA" />
+                                </ui:Button>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Sparkline Viewport (Expandable) -->
+                        <Border
+                            Grid.Row="1"
+                            Margin="0,6,0,0"
+                            Height="44"
+                            Background="#111113"
+                            CornerRadius="5"
+                            Padding="4,2,4,2"
+                            ClipToBounds="True">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsSparklineExpanded}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+
+                            <Grid>
+                                <!-- Collecting placeholder -->
+                                <TextBlock
+                                    Text="{Binding Loc.CollectingData}"
+                                    FontSize="10"
+                                    Foreground="#71717A"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasSparklineData}" Value="False">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+
+                                <!-- Gemini Sparkline Curve -->
+                                <Path
+                                    Data="{Binding GeminiSparklinePath}"
+                                    Stroke="#3B82F6"
+                                    StrokeThickness="1.8"
+                                    StrokeLineJoin="Round"
+                                    StrokeStartLineCap="Round"
+                                    StrokeEndLineCap="Round">
+                                    <Path.Style>
+                                        <Style TargetType="Path">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasSparklineData}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Path.Style>
+                                </Path>
+
+                                <!-- Claude Sparkline Curve -->
+                                <Path
+                                    Data="{Binding ClaudeSparklinePath}"
+                                    Stroke="#F97316"
+                                    StrokeThickness="1.8"
+                                    StrokeLineJoin="Round"
+                                    StrokeStartLineCap="Round"
+                                    StrokeEndLineCap="Round">
+                                    <Path.Style>
+                                        <Style TargetType="Path">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasSparklineData}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Path.Style>
+                                </Path>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </ui:Card>
+
+                <!-- Footer -->
+                <Grid Grid.Row="4" Margin="2,0,2,0">
+                    <TextBlock
+                        Text="{Binding LastUpdatedText, StringFormat='{}Обновлено: {0}'}"
+                        FontSize="10"
+                        Foreground="#71717A"
+                        FontFamily="Consolas, Segoe UI, sans-serif"
+                        VerticalAlignment="Center" />
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</ui:FluentWindow>
