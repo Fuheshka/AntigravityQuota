@@ -11,7 +11,7 @@
 
 .EXAMPLE
     .\scripts\build_windows_release.ps1
-    .\scripts\build_windows_release.ps1 -Version "1.1.0"
+    .\scripts\build_windows_release.ps1 -Version "1.2.0"
 #>
 
 [CmdletBinding()]
@@ -39,7 +39,7 @@ if ([string]::IsNullOrWhiteSpace($Version)) {
     if ($versionMatch.Success) {
         $Version = $versionMatch.Groups[1].Value.Trim()
     } else {
-        $Version = "1.1.0"
+        $Version = "1.2.0"
     }
 }
 

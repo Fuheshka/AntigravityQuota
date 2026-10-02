@@ -1,7 +1,7 @@
 import Foundation
 import CoreGraphics
 
-public let AntigravityQuotaCurrentVersion = "1.1.0"
+public let AntigravityQuotaCurrentVersion = "1.2.0"
 public let AntigravityQuotaGitHubRepo = "Fuheshka/AntigravityQuota"
 
 public enum Localization {

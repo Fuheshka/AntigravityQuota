@@ -132,7 +132,7 @@ public final class QuotaClient: @unchecked Sendable {
     public static func buildDiagnosticReport(endpoint: ServerEndpoint?, snapshot: QuotaSnapshot?) -> String {
         var lines: [String] = []
         lines.append("=== AntigravityQuota Diagnostics ===")
-        lines.append("App: AntigravityQuota v1.1.0")
+        lines.append("App: AntigravityQuota v\(AntigravityQuotaCurrentVersion)")
         lines.append("macOS: \(ProcessInfo.processInfo.operatingSystemVersionString)")
         if let ep = endpoint {
             lines.append("language_server: Connected (PID: \(ep.pid))")

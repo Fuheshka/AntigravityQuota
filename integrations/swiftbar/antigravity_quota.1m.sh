@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # <swiftbar.name>Antigravity Quota</swiftbar.name>
-# <swiftbar.version>v1.1.0</swiftbar.version>
+# <swiftbar.version>v1.2.0</swiftbar.version>
 # <swiftbar.author>Daniil K. (Fuheshka)</swiftbar.author>
 # <swiftbar.author.github>Fuheshka</swiftbar.author.github>
 # <swiftbar.desc>Real-time Google Antigravity model quotas and reset countdowns in your macOS menu bar</swiftbar.desc>

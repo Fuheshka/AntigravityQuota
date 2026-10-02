@@ -4,7 +4,7 @@ import sys
 import subprocess
 import time
 
-def finalize_dmg(dmg_path="dist/AntigravityQuota-v1.1.0-macOS.dmg", vol_name="AntigravityQuota"):
+def finalize_dmg(dmg_path="dist/AntigravityQuota-v1.2.0-macOS.dmg", vol_name="AntigravityQuota"):
     if len(sys.argv) > 1:
         dmg_path = sys.argv[1]
     if len(sys.argv) > 2:
