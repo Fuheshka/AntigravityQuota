@@ -12,3 +12,10 @@ docs/*
 !docs/assets/
 implementation-notes.md
 
+# .NET / C#
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+.vs/
+TestResults/
