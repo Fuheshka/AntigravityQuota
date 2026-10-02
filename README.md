@@ -220,7 +220,9 @@ Ready-to-use scripts with Nerd Font glyphs, dynamic status color alerts, model b
 
 ## Installation
 
-### Homebrew (Recommended)
+### macOS
+
+#### Homebrew (Recommended)
 
 Install and keep AntigravityQuota updated with a single terminal command via Homebrew Cask:
 
@@ -237,13 +239,12 @@ To update to the latest release in the future:
 brew upgrade --cask antigravity-quota
 ```
 
-### Manual Download
+#### Pre-built macOS Release
 
 Download the pre-packaged `.dmg` or `.zip` installer from [GitHub Releases](https://github.com/Fuheshka/AntigravityQuota/releases/latest).
 
-### Build from Source
+#### Build from Source on macOS
 
-#### Requirements
 - macOS 13.0 (Ventura) or later
 - Swift 5.9+ (Xcode Command Line Tools)
 
@@ -259,6 +260,55 @@ swift test
 
 # Launch application
 open /Applications/AntigravityQuota.app
+```
+
+---
+
+### Windows
+
+#### Pre-built Portable Release (Single-File)
+
+AntigravityQuota provides a self-contained portable executable `AntigravityQuota.exe` (ReadyToRun, Self-Contained). No prior .NET Runtime installation is needed: all necessary libraries and dependencies are bundled directly inside the binary.
+
+1. Download `AntigravityQuota-v1.x.x-windows-x64.zip` from [GitHub Releases](https://github.com/Fuheshka/AntigravityQuota/releases/latest).
+2. Extract the archive into your preferred directory (e.g. `C:\Tools\AntigravityQuota`).
+3. Run `AntigravityQuota.exe`.
+
+The application will dock into your Windows taskbar system tray next to the clock. Clicking the tray icon opens an interactive flyout showing your real-time quota balances, model reset countdowns, and quick actions.
+
+#### Usage on Windows
+- **System Tray:** Displays real-time status and color indicators. Right-click opens the context menu (refresh quotas, open diagnostics, quit), left-click reveals detailed statistics.
+- **Floating HUD Overlay:** Smooth overlay anchored over Antigravity editor with full card and compact pill modes.
+- **Global Hotkeys:**
+  - `Alt + Shift + Q` - toggle floating HUD overlay visibility.
+  - `Alt + Shift + M` - toggle between full card (256 pt) and compact pill modes.
+  - `Alt + Shift + R` - force-refresh quota balance from local Antigravity server.
+
+#### Build from Source on Windows
+
+Requirements:
+- Windows 10/11 x64
+- .NET 9.0 SDK or later
+
+Build release distribution archive using PowerShell:
+```powershell
+# Clone repository
+git clone https://github.com/Fuheshka/AntigravityQuota.git
+cd AntigravityQuota
+
+# Run automated Windows release builder script
+.\scripts\build_windows_release.ps1
+```
+
+Once completed, the packaged `AntigravityQuota-v1.x.x-windows-x64.zip` archive and standalone `AntigravityQuota.exe` will be located in the `dist/` directory.
+
+Manual build via .NET CLI:
+```powershell
+# Run unit tests
+dotnet test src/windows/AntigravityQuota.sln
+
+# Publish self-contained single-file executable
+dotnet publish src/windows/AntigravityQuota.App/AntigravityQuota.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishReadyToRun=true
 ```
 
 ---

@@ -220,7 +220,9 @@ sudo ln -sf "/Applications/AntigravityQuota.app/Contents/MacOS/AntigravityQuota"
 
 ## Установка и запуск
 
-### Homebrew (рекомендуется)
+### macOS
+
+#### Homebrew (рекомендуется)
 
 Установка и обновление AntigravityQuota одной терминальной командой через официальный Homebrew Cask:
 
@@ -237,13 +239,12 @@ brew install --cask antigravity-quota
 brew upgrade --cask antigravity-quota
 ```
 
-### Загрузка готового релиза
+#### Загрузка готового релиза macOS
 
 Скачайте готовый `.dmg` или `.zip` установщик со страницы [GitHub Releases](https://github.com/Fuheshka/AntigravityQuota/releases/latest).
 
-### Сборка из исходников
+#### Сборка из исходников на macOS
 
-#### Системные требования
 - macOS 13.0 (Ventura) или новее
 - Swift 5.9+ (Xcode Command Line Tools)
 
@@ -259,6 +260,55 @@ swift test
 
 # Запуск приложения
 open /Applications/AntigravityQuota.app
+```
+
+---
+
+### Windows
+
+#### Загрузка готового портативного релиза (Single-File)
+
+Для Windows предоставляется полностью автономный исполняемый файл `AntigravityQuota.exe` (Self-Contained Single-File, ReadyToRun). Предустановка .NET Runtime не требуется: все необходимые компоненты и библиотеки уже упакованы внутрь исполняемого файла.
+
+1. Скачайте архив `AntigravityQuota-v1.x.x-windows-x64.zip` со страницы [GitHub Releases](https://github.com/Fuheshka/AntigravityQuota/releases/latest).
+2. Распакуйте архив в любую удобную папку (например, `C:\Tools\AntigravityQuota` или папку профиля пользователя).
+3. Запустите `AntigravityQuota.exe`.
+
+Приложение автоматически появится в системном трее Windows рядом с часами. Клик по иконке трея открывает интерактивное окно с текущим балансом квот, раскладкой по моделям и таймерами сброса.
+
+#### Использование на Windows
+- **Системный трей Windows:** отображает статус и цветной индикатор остатка. Правый клик открывает контекстное меню (обновление квот, открытие окна диагностики, выход), левый клик - плавающее окно детальной статистики.
+- **Плавающий HUD поверх Antigravity:** переключаемый оверлей с поддержкой двух режимов (полная карточка 256 pt и компактная таблетка).
+- **Глобальные горячие клавиши:**
+  - `Alt + Shift + Q` - показать или скрыть плавающий HUD.
+  - `Alt + Shift + M` - переключить виджет между карточкой и таблеткой.
+  - `Alt + Shift + R` - принудительно обновить квоты из локального сервера Antigravity.
+
+#### Сборка из исходников на Windows
+
+Требования:
+- Windows 10/11 x64
+- .NET 9.0 SDK или новее
+
+Сборка готового релизного дистрибутива через PowerShell:
+```powershell
+# Клонирование репозитория
+git clone https://github.com/Fuheshka/AntigravityQuota.git
+cd AntigravityQuota
+
+# Запуск автоматического скрипта сборки релиза
+.\scripts\build_windows_release.ps1
+```
+
+После завершения скрипта готовый архив `AntigravityQuota-v1.x.x-windows-x64.zip` и автономный бинарник `AntigravityQuota.exe` будут находиться в каталоге `dist/`.
+
+Ручная сборка через .NET CLI:
+```powershell
+# Запуск тестов
+dotnet test src/windows/AntigravityQuota.sln
+
+# Публикация автономного Single-File приложения
+dotnet publish src/windows/AntigravityQuota.App/AntigravityQuota.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishReadyToRun=true
 ```
 
 ---
