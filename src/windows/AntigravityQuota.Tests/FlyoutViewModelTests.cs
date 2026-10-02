@@ -115,4 +115,16 @@ public class FlyoutViewModelTests
         Assert.True(callbackInvoked);
         Assert.False(vm.IsRefreshing);
     }
+
+    [Fact]
+    public void ShowAboutCommand_RaisesOnShowAboutRequested()
+    {
+        bool aboutRequested = false;
+        var vm = new FlyoutViewModel();
+        vm.OnShowAboutRequested += () => aboutRequested = true;
+
+        vm.ShowAboutCommand.Execute(null);
+
+        Assert.True(aboutRequested);
+    }
 }

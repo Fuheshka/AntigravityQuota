@@ -72,15 +72,33 @@ public class LocalizationManager
         : "Real-time model quota monitor & HUD for Google Antigravity";
     public string AboutHotkeysTitle => IsRussian ? "Горячие клавиши:" : "Global Hotkeys:";
     public string AboutHotkeyToggleHud => IsRussian 
-        ? "• Alt + Shift + Q — показать / скрыть виджет HUD" 
-        : "• Alt + Shift + Q — Show / hide HUD widget";
+        ? "• Alt + Shift + Q - показать / скрыть виджет HUD" 
+        : "• Alt + Shift + Q - Show / hide HUD widget";
     public string AboutHotkeyTogglePill => IsRussian 
-        ? "• Alt + Shift + M — переключить режим таблетки и карточки" 
-        : "• Alt + Shift + M — Toggle pill and card mode";
+        ? "• Alt + Shift + M - переключить режим таблетки и карточки" 
+        : "• Alt + Shift + M - Toggle pill and card mode";
     public string AboutHotkeyRefresh => IsRussian 
-        ? "• Alt + Shift + R — принудительно обновить квоты" 
-        : "• Alt + Shift + R — Force refresh quotas now";
+        ? "• Alt + Shift + R - принудительно обновить квоты" 
+        : "• Alt + Shift + R - Force refresh quotas now";
+    public string AboutTipDrag => IsRussian
+        ? "• Alt + ЛКМ - перемещение HUD в режиме сквозного клика"
+        : "• Alt + Left Click - drag HUD in click-through mode";
     public string AboutCheckUpdates => IsRussian ? "Проверить обновления..." : "Check for Updates...";
+
+    public string AboutTitle => IsRussian ? "О программе AntigravityQuota" : "About AntigravityQuota";
+    public string AboutConnectionStatus => IsRussian ? "Статус соединения" : "Connection status";
+    public string AboutServerPid => IsRussian ? "PID процесса" : "Process PID";
+    public string AboutServerPorts => IsRussian ? "Открытые порты" : "Listening ports";
+    public string AboutCsrfToken => IsRussian ? "CSRF-токен" : "CSRF token";
+    public string AboutLastSync => IsRussian ? "Последнее обновление" : "Last quota sync";
+    public string AboutCopyReport => IsRussian ? "Скопировать отчет диагностики" : "Copy diagnostic report";
+    public string AboutReportCopied => IsRussian ? "Отчет скопирован в буфер обмена" : "Diagnostic report copied to clipboard";
+    public string AboutRepository => IsRussian ? "Репозиторий GitHub" : "GitHub repository";
+    public string AboutReleases => IsRussian ? "Релизы и загрузки" : "Releases & downloads";
+    public string AboutPlatform => IsRussian ? "Платформа" : "Platform";
+    public string AboutConnected => IsRussian ? "Подключено" : "Connected";
+    public string AboutDisconnected => IsRussian ? "Не обнаружено (ожидание среды)" : "Not detected (waiting for IDE)";
+    public string AboutNever => IsRussian ? "Никогда" : "Never";
 
     // Tooltip formatting
     public string FormatTrayTooltip(double? geminiPct, double? claudePct)

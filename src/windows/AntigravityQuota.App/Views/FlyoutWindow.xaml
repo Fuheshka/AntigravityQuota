@@ -340,12 +340,18 @@
                     <TextBlock Text="{Binding LastUpdatedText}" FontSize="11" Foreground="#A1A1AA" />
                 </StackPanel>
 
-                <TextBlock
+                <ui:Button
                     HorizontalAlignment="Right"
                     VerticalAlignment="Center"
-                    Text="v1.0.0"
-                    FontSize="10"
-                    Foreground="#52525B" />
+                    Command="{Binding ShowAboutCommand}"
+                    Padding="4,2,4,2"
+                    Appearance="Transparent"
+                    ToolTip="{Binding Loc.MenuAbout}">
+                    <TextBlock
+                        Text="v1.0.0"
+                        FontSize="10"
+                        Foreground="#71717A" />
+                </ui:Button>
             </Grid>
         </Grid>
     </Border>

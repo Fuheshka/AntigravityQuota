@@ -5,6 +5,7 @@ using System.Windows.Interop;
 using System.Windows.Media.Imaging;
 using AntigravityQuota.App.Views;
 using AntigravityQuota.Core.ViewModels;
+using AntigravityQuota.Core.Models;
 using AntigravityQuota.Core;
 using Wpf.Ui.Tray.Controls;
 
@@ -18,6 +19,9 @@ public partial class App : Application
     private FlyoutViewModel? _viewModel;
     private QuotaHudWindow? _hudWindow;
     private HudViewModel? _hudViewModel;
+    private AboutWindow? _aboutWindow;
+    private AboutViewModel? _aboutViewModel;
+    private QuotaSnapshot? _latestSnapshot;
     private WindowContextTracker? _tracker;
     private GlobalHotkeyManager? _hotkeyManager;
     private NotifyIcon? _notifyIcon;
@@ -51,8 +55,10 @@ public partial class App : Application
                     var snap = await _client.FetchSnapshotAsync(forceRefresh: true, ct);
                     Dispatcher.Invoke(() =>
                     {
+                        _latestSnapshot = snap;
                         _viewModel?.UpdateFromSnapshot(snap);
                         _hudViewModel?.UpdateFromSnapshot(snap);
+                        _aboutViewModel?.UpdateState(_client.CachedEndpoint, snap, snap?.UpdatedAt);
                         if (_notifyIcon != null && _viewModel != null)
                         {
                             _notifyIcon.TooltipText = _viewModel.TrayTooltipText;
@@ -69,7 +75,26 @@ public partial class App : Application
             loc: loc,
             triggerRefreshCallback: triggerRefresh);
 
-        // 2. Initialize HUD ViewModel, Window Context Tracker and Window
+        // 2. Initialize About ViewModel
+        _aboutViewModel = new AboutViewModel(
+            loc: loc,
+            clipboardSetter: text => Dispatcher.Invoke(() =>
+            {
+                try
+                {
+                    Clipboard.SetText(text);
+                }
+                catch
+                {
+                    // Fail gracefully if clipboard is busy
+                }
+            }),
+            endpointResolver: () => _client?.CachedEndpoint ?? ServerDiscovery.DiscoverActiveServer(),
+            snapshotResolver: () => _latestSnapshot);
+
+        _viewModel.OnShowAboutRequested += () => Dispatcher.Invoke(ShowAboutDialog);
+
+        // 3. Initialize HUD ViewModel, Window Context Tracker and Window
         var hudSettings = HudSettingsManager.Load();
         _hudViewModel = new HudViewModel(
             settings: hudSettings,
@@ -326,7 +351,7 @@ public partial class App : Application
         };
         aboutItem.Click += (s, e) =>
         {
-            ShowAboutDialog(loc);
+            ShowAboutDialog();
         };
         contextMenu.Items.Add(aboutItem);
 
@@ -380,8 +405,10 @@ public partial class App : Application
                     var snapshot = await _client.FetchSnapshotAsync(forceRefresh: false, ct);
                     Dispatcher.Invoke(() =>
                     {
+                        _latestSnapshot = snapshot;
                         _viewModel?.UpdateFromSnapshot(snapshot);
                         _hudViewModel?.UpdateFromSnapshot(snapshot);
+                        _aboutViewModel?.UpdateState(_client.CachedEndpoint, snapshot, snapshot?.UpdatedAt);
                         if (_notifyIcon != null && _viewModel != null)
                         {
                             _notifyIcon.TooltipText = _viewModel.TrayTooltipText;
@@ -404,23 +431,28 @@ public partial class App : Application
         }
     }
 
-    private void ShowAboutDialog(LocalizationManager loc)
+    private void ShowAboutDialog()
     {
-        var aboutMessage = $"{loc.AppTitle}\n\n" +
-                           $"{loc.AboutDescription}\n\n" +
-                           $"{loc.AboutHotkeysTitle}\n" +
-                           $"{loc.AboutHotkeyToggleHud}\n" +
-                           $"{loc.AboutHotkeyTogglePill}\n" +
-                           $"{loc.AboutHotkeyRefresh}\n\n" +
-                           $"{loc.AboutAuthor}\n" +
-                           $"GitHub: https://github.com/Fuheshka/AntigravityQuota\n\n" +
-                           $"Copyright © 2026 Daniil K. (Fuheshka). All rights reserved.";
+        if (_aboutViewModel == null) return;
 
-        MessageBox.Show(
-            aboutMessage,
-            loc.MenuAbout.Replace("...", ""),
-            MessageBoxButton.OK,
-            MessageBoxImage.Information);
+        var endpoint = _client?.CachedEndpoint ?? ServerDiscovery.DiscoverActiveServer();
+        _aboutViewModel.UpdateState(endpoint, _latestSnapshot, _latestSnapshot?.UpdatedAt);
+
+        if (_aboutWindow == null || !_aboutWindow.IsLoaded)
+        {
+            _aboutWindow = new AboutWindow(_aboutViewModel);
+            _aboutWindow.Closed += (s, e) => _aboutWindow = null;
+            _aboutWindow.Show();
+        }
+        else
+        {
+            if (_aboutWindow.WindowState == WindowState.Minimized)
+            {
+                _aboutWindow.WindowState = WindowState.Normal;
+            }
+            _aboutWindow.Activate();
+            _aboutWindow.Focus();
+        }
     }
 
     private void ShutdownApp()
@@ -431,6 +463,7 @@ public partial class App : Application
         _notifyIcon?.Unregister();
         _flyout?.Close();
         _hudWindow?.Close();
+        _aboutWindow?.Close();
         Current.Shutdown();
     }
 
@@ -441,6 +474,7 @@ public partial class App : Application
         _tracker?.Dispose();
         _notifyIcon?.Unregister();
         _hudWindow?.Close();
+        _aboutWindow?.Close();
         base.OnExit(e);
     }
 }

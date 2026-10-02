@@ -54,6 +54,7 @@ public class FlyoutViewModel : INotifyPropertyChanged
         _claudeBurnRateText = _loc.IsRussian ? "~0%/ч" : "~0%/h";
 
         RefreshCommand = new RelayCommand(async () => await RefreshAsync(), () => !IsRefreshing);
+        ShowAboutCommand = new RelayCommand(() => OnShowAboutRequested?.Invoke());
     }
 
     public LocalizationManager Loc => _loc;
@@ -173,6 +174,8 @@ public class FlyoutViewModel : INotifyPropertyChanged
     }
 
     public ICommand RefreshCommand { get; }
+    public ICommand ShowAboutCommand { get; }
+    public event Action? OnShowAboutRequested;
 
     public async Task RefreshAsync()
     {
