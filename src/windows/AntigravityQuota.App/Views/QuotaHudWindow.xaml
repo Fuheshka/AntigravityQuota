@@ -1,4 +1,4 @@
-<ui:FluentWindow
+<Window
     x:Class="AntigravityQuota.App.Views.QuotaHudWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -9,17 +9,27 @@
     mc:Ignorable="d"
     Title="AntigravityQuota HUD"
     WindowStyle="None"
+    AllowsTransparency="True"
     ResizeMode="NoResize"
     ShowInTaskbar="False"
     Topmost="True"
-    WindowBackdropType="Mica"
-    WindowCornerPreference="Round"
-    ExtendsContentIntoTitleBar="True"
+    SizeToContent="WidthAndHeight"
+    Style="{x:Null}"
     Background="Transparent"
     Foreground="#F3F3F3"
     d:DataContext="{d:DesignInstance vm:HudViewModel}">
 
     <Grid x:Name="RootContainer" MouseLeftButtonDown="OnRootMouseLeftButtonDown" Background="{x:Null}">
+        <Grid.ContextMenu>
+            <ContextMenu>
+                <MenuItem Header="{Binding Loc.MenuCompactPillMode}" Command="{Binding TogglePillModeCommand}" />
+                <MenuItem Header="{Binding Loc.MenuRefreshNow}" Command="{Binding RefreshCommand}" />
+                <Separator />
+                <MenuItem Header="{Binding Loc.MenuEnableHUD}" Click="OnHideHudClick" />
+                <MenuItem Header="{Binding Loc.MenuExit}" Click="OnExitAppClick" />
+            </ContextMenu>
+        </Grid.ContextMenu>
+
         <!-- 1. COMPACT PILL MODE (Capsule HUD: ~230x32 px) -->
         <Border
             x:Name="PillView"
@@ -29,9 +39,7 @@
             BorderBrush="#29FFFFFF"
             BorderThickness="1"
             Padding="10,0,8,0"
-            Cursor="SizeAll"
-            HorizontalAlignment="Left"
-            VerticalAlignment="Top">
+            Cursor="SizeAll">
             <Border.Style>
                 <Style TargetType="Border">
                     <Setter Property="Visibility" Value="Collapsed" />
@@ -146,9 +154,7 @@
             BorderBrush="#29FFFFFF"
             BorderThickness="1"
             Padding="12,10,12,10"
-            Cursor="SizeAll"
-            HorizontalAlignment="Left"
-            VerticalAlignment="Top">
+            Cursor="SizeAll">
             <Border.Style>
                 <Style TargetType="Border">
                     <Setter Property="Visibility" Value="Collapsed" />
@@ -729,4 +735,4 @@
             </StackPanel>
         </Border>
     </Grid>
-</ui:FluentWindow>
+</Window>

@@ -26,8 +26,15 @@ public partial class FlyoutWindow : FluentWindow
         Hide();
     }
 
+    public bool IsExplicitShutdown { get; set; } = false;
+
     protected override void OnClosing(CancelEventArgs e)
     {
+        if (IsExplicitShutdown)
+        {
+            return;
+        }
+
         // Intercept close and hide instead, keeping visual state and resources cached
         e.Cancel = true;
         Hide();

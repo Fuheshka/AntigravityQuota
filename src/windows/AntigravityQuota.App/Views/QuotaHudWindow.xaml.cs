@@ -12,7 +12,7 @@ using Wpf.Ui.Controls;
 
 namespace AntigravityQuota.App.Views;
 
-public partial class QuotaHudWindow : FluentWindow
+public partial class QuotaHudWindow : Window
 {
     private readonly HudViewModel _viewModel;
     private readonly WindowContextTracker? _tracker;
@@ -119,14 +119,11 @@ public partial class QuotaHudWindow : FluentWindow
             // 1. Apply Win32 Extended Styles: ToolWindow, TopMost, NoActivate
             Win32Interop.ApplyHudWindowStyles(_hwnd);
 
-            // 2. Apply Win32 DWM Attributes: Mica / Acrylic backdrop and round corners
-            Win32Interop.ApplyHudWindowAttributes(_hwnd);
-
-            // 3. Intercept WM_MOUSEACTIVATE to prevent stealing keyboard focus from active IDE
+            // 2. Intercept WM_MOUSEACTIVATE to prevent stealing keyboard focus from active IDE
             var source = HwndSource.FromHwnd(_hwnd);
             source?.AddHook(WndProc);
 
-            // 4. Hook global hotkeys (WM_HOTKEY) and register Alt+Shift+Q / M / R
+            // 3. Hook global hotkeys (WM_HOTKEY) and register Alt+Shift+Q / M / R
             if (_hotkeyManager != null)
             {
                 source?.AddHook(_hotkeyManager.HookCallback);
@@ -136,7 +133,7 @@ public partial class QuotaHudWindow : FluentWindow
                 }
             }
 
-            // 5. Initialize click-through state
+            // 4. Initialize click-through state
             UpdateClickThrough();
         }
 
@@ -164,14 +161,13 @@ public partial class QuotaHudWindow : FluentWindow
         {
             Width = double.NaN;
             Height = double.NaN;
-            SizeToContent = SizeToContent.WidthAndHeight;
         }
         else
         {
             Width = 256;
             Height = double.NaN;
-            SizeToContent = SizeToContent.Height;
         }
+        SizeToContent = SizeToContent.WidthAndHeight;
 
         InvalidateMeasure();
         UpdateLayout();
@@ -370,12 +366,29 @@ public partial class QuotaHudWindow : FluentWindow
         return null;
     }
 
+    public bool IsExplicitShutdown { get; set; } = false;
+
     protected override void OnClosing(CancelEventArgs e)
     {
+        if (IsExplicitShutdown)
+        {
+            return;
+        }
+
         // Keep window instance cached in memory; hide instead of closing
         e.Cancel = true;
         Hide();
         _viewModel.IsEnabled = false;
+    }
+
+    private void OnHideHudClick(object sender, RoutedEventArgs e)
+    {
+        HideHud();
+    }
+
+    private void OnExitAppClick(object sender, RoutedEventArgs e)
+    {
+        App.ShutdownApplication();
     }
 
     public void ShowHud()

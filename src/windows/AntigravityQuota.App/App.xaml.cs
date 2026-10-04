@@ -166,6 +166,9 @@ public partial class App : Application
 
         // 3. Initialize FlyoutWindow (hidden by default)
         _flyout = new FlyoutWindow(_viewModel);
+        var flyoutHelper = new WindowInteropHelper(_flyout);
+        flyoutHelper.EnsureHandle();
+        MainWindow = _flyout;
 
         // 4. Initialize System Tray Icon
         SetupNotifyIcon(loc);
@@ -181,19 +184,27 @@ public partial class App : Application
     {
         _notifyIcon = new NotifyIcon
         {
-            FocusOnLeftClick = true,
+            FocusOnLeftClick = false,
             MenuOnRightClick = true,
             TooltipText = _viewModel?.TrayTooltipText ?? "AntigravityQuota"
         };
 
         try
         {
-            var iconUri = new Uri("pack://application:,,,/Assets/app-icon.ico", UriKind.Absolute);
+            var iconUri = new Uri("pack://application:,,,/AntigravityQuota;component/Assets/app-icon.ico", UriKind.Absolute);
             _notifyIcon.Icon = BitmapFrame.Create(iconUri);
         }
         catch
         {
-            // Fallback if ico resource fails to load
+            try
+            {
+                var fallbackUri = new Uri("pack://application:,,,/Assets/app-icon.ico", UriKind.Absolute);
+                _notifyIcon.Icon = BitmapFrame.Create(fallbackUri);
+            }
+            catch
+            {
+                // Fallback handled by Hicon.FromApp()
+            }
         }
 
         // Left click on tray toggles the FlyoutWindow
@@ -412,6 +423,12 @@ public partial class App : Application
 
         _notifyIcon.Menu = contextMenu;
         _notifyIcon.Register();
+
+        if (!_notifyIcon.IsRegistered && _hudWindow != null)
+        {
+            MainWindow = _hudWindow;
+            _notifyIcon.Register();
+        }
     }
 
     public void ToggleFlyout()
@@ -595,6 +612,18 @@ public partial class App : Application
         }
     }
 
+    public static void ShutdownApplication()
+    {
+        if (Current is App app)
+        {
+            app.ShutdownApp();
+        }
+        else
+        {
+            Environment.Exit(0);
+        }
+    }
+
     private void ShutdownApp()
     {
         _cts?.Cancel();
@@ -602,10 +631,19 @@ public partial class App : Application
         _tracker?.Dispose();
         _updateChecker?.Dispose();
         _notifyIcon?.Unregister();
-        _flyout?.Close();
-        _hudWindow?.Close();
+        if (_flyout != null)
+        {
+            _flyout.IsExplicitShutdown = true;
+            _flyout.Close();
+        }
+        if (_hudWindow != null)
+        {
+            _hudWindow.IsExplicitShutdown = true;
+            _hudWindow.Close();
+        }
         _aboutWindow?.Close();
         Current.Shutdown();
+        Environment.Exit(0);
     }
 
     protected override void OnExit(ExitEventArgs e)
