@@ -137,9 +137,39 @@ public class UpdateCheckResult
 public class UpdateChecker : IDisposable
 {
     public const string DefaultRepository = "Fuheshka/AntigravityQuota";
-    public const string DefaultVersion = "1.0.0";
+    public const string DefaultVersion = "1.2.0";
     public static readonly TimeSpan DefaultCooldown = TimeSpan.FromHours(24);
     public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(4);
+
+    /// <summary>
+    /// Resolves the current running assembly version, falling back to DefaultVersion ("1.2.0").
+    /// </summary>
+    public static string ResolveCurrentVersion()
+    {
+        try
+        {
+            var entry = System.Reflection.Assembly.GetEntryAssembly();
+            if (entry != null && entry.GetName().Name?.StartsWith("AntigravityQuota", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                var ver = entry.GetName().Version;
+                if (ver != null && (ver.Major > 0 || ver.Minor > 0 || ver.Build > 0))
+                {
+                    return $"{ver.Major}.{ver.Minor}.{Math.Max(0, ver.Build)}";
+                }
+            }
+
+            var coreVer = typeof(UpdateChecker).Assembly.GetName().Version;
+            if (coreVer != null && (coreVer.Major > 0 || coreVer.Minor > 0 || coreVer.Build > 0))
+            {
+                return $"{coreVer.Major}.{coreVer.Minor}.{Math.Max(0, coreVer.Build)}";
+            }
+        }
+        catch
+        {
+            // Fail silent fallback
+        }
+        return DefaultVersion;
+    }
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -400,7 +430,9 @@ public class UpdateChecker : IDisposable
 
     /// <summary>
     /// Resolves the optimal download URL for Windows:
-    /// Prioritizes .exe -> .msi -> .zip, falling back to release.HtmlUrl.
+    /// Prioritizes .exe -> .msi -> Windows-specific archives (.zip/.7z/.tar.gz).
+    /// Filters out foreign OS assets (macOS, Linux, Android) to prevent cross-platform download collisions.
+    /// Falls back to release.HtmlUrl if no suitable Windows asset is present.
     /// </summary>
     public static string ResolveDownloadUrl(GitHubReleaseInfo release)
     {
@@ -408,34 +440,76 @@ public class UpdateChecker : IDisposable
 
         if (release.Assets != null && release.Assets.Count > 0)
         {
-            // 1. Prioritize .exe
-            var exeAsset = release.Assets.FirstOrDefault(a =>
-                !string.IsNullOrWhiteSpace(a.Name) &&
-                a.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
+            var validAssets = release.Assets
+                .Where(a => !string.IsNullOrWhiteSpace(a.Name) && !string.IsNullOrWhiteSpace(a.BrowserDownloadUrl))
+                .ToList();
 
-            if (exeAsset != null && !string.IsNullOrWhiteSpace(exeAsset.BrowserDownloadUrl))
+            static bool IsForeignToWindows(string fileName)
+            {
+                var lower = fileName.ToLowerInvariant();
+                // Foreign OS file extensions
+                if (lower.EndsWith(".dmg") || lower.EndsWith(".pkg") ||
+                    lower.EndsWith(".appimage") || lower.EndsWith(".deb") ||
+                    lower.EndsWith(".rpm") || lower.EndsWith(".apk") || lower.EndsWith(".aab"))
+                {
+                    return true;
+                }
+                // Foreign OS keywords
+                if (lower.Contains("macos") || lower.Contains("darwin") || lower.Contains("osx") ||
+                    lower.Contains("apple") || lower.Contains("linux") || lower.Contains("ubuntu") ||
+                    lower.Contains("debian") || lower.Contains("android"))
+                {
+                    return true;
+                }
+                // Word-boundary / hyphen-boundary mac indicators ("-mac.", "-mac-", "_mac.", "_mac_")
+                if (lower.Contains("-mac.") || lower.Contains("-mac-") ||
+                    lower.Contains("_mac.") || lower.Contains("_mac_") ||
+                    lower.Contains(".mac."))
+                {
+                    return true;
+                }
+                return false;
+            }
+
+            var winCandidates = validAssets.Where(a => !IsForeignToWindows(a.Name)).ToList();
+
+            // 1. Prioritize native executable/installer (.exe)
+            var exeAsset = winCandidates.FirstOrDefault(a =>
+                a.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
+            if (exeAsset != null)
             {
                 return exeAsset.BrowserDownloadUrl;
             }
 
-            // 2. Prioritize .msi
-            var msiAsset = release.Assets.FirstOrDefault(a =>
-                !string.IsNullOrWhiteSpace(a.Name) &&
+            // 2. Prioritize MSI installer (.msi)
+            var msiAsset = winCandidates.FirstOrDefault(a =>
                 a.Name.EndsWith(".msi", StringComparison.OrdinalIgnoreCase));
-
-            if (msiAsset != null && !string.IsNullOrWhiteSpace(msiAsset.BrowserDownloadUrl))
+            if (msiAsset != null)
             {
                 return msiAsset.BrowserDownloadUrl;
             }
 
-            // 3. Fallback to .zip
-            var zipAsset = release.Assets.FirstOrDefault(a =>
-                !string.IsNullOrWhiteSpace(a.Name) &&
-                a.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
-
-            if (zipAsset != null && !string.IsNullOrWhiteSpace(zipAsset.BrowserDownloadUrl))
+            // 3. Prioritize Windows-specific archives (contains "win" or "windows")
+            var winZipAsset = winCandidates.FirstOrDefault(a =>
             {
-                return zipAsset.BrowserDownloadUrl;
+                var lower = a.Name.ToLowerInvariant();
+                if (!lower.EndsWith(".zip") && !lower.EndsWith(".7z") && !lower.EndsWith(".tar.gz"))
+                {
+                    return false;
+                }
+                return lower.Contains("win") || lower.Contains("windows");
+            });
+            if (winZipAsset != null)
+            {
+                return winZipAsset.BrowserDownloadUrl;
+            }
+
+            // 4. Fallback to generic archive (if no OS markers exist at all)
+            var genericZipAsset = winCandidates.FirstOrDefault(a =>
+                a.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
+            if (genericZipAsset != null)
+            {
+                return genericZipAsset.BrowserDownloadUrl;
             }
         }
 

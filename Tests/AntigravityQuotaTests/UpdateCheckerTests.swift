@@ -44,6 +44,30 @@ final class UpdateCheckerTests: XCTestCase {
         XCTAssertEqual(androidAsset?.name, "AntigravityQuota-v1.2.0.apk")
     }
 
+    func testMultiPlatformAssetMatchingSeparatesWindowsAndMacZip() {
+        let multiPlatformAssets = [
+            GitHubAsset(name: "AntigravityQuota-v1.2.0-macOS.dmg", browserDownloadUrl: URL(string: "https://example.com/download.dmg")!),
+            GitHubAsset(name: "AntigravityQuota-v1.2.0-macOS.zip", browserDownloadUrl: URL(string: "https://example.com/download-mac.zip")!),
+            GitHubAsset(name: "AntigravityQuota-v1.2.0-windows-x64.zip", browserDownloadUrl: URL(string: "https://example.com/download-win.zip")!)
+        ]
+
+        // Windows should match windows zip, NOT macOS zip or dmg
+        let winMatch = UpdateChecker.findBestAsset(in: multiPlatformAssets, for: .windows)
+        XCTAssertEqual(winMatch?.name, "AntigravityQuota-v1.2.0-windows-x64.zip")
+
+        // macOS should match dmg
+        let macMatch = UpdateChecker.findBestAsset(in: multiPlatformAssets, for: .macOS)
+        XCTAssertEqual(macMatch?.name, "AntigravityQuota-v1.2.0-macOS.dmg")
+
+        // If only zips exist, macOS matches macOS zip, NOT windows zip
+        let zipOnlyAssets = [
+            GitHubAsset(name: "AntigravityQuota-v1.2.0-windows-x64.zip", browserDownloadUrl: URL(string: "https://example.com/download-win.zip")!),
+            GitHubAsset(name: "AntigravityQuota-v1.2.0-macOS.zip", browserDownloadUrl: URL(string: "https://example.com/download-mac.zip")!)
+        ]
+        let macZipMatch = UpdateChecker.findBestAsset(in: zipOnlyAssets, for: .macOS)
+        XCTAssertEqual(macZipMatch?.name, "AntigravityQuota-v1.2.0-macOS.zip")
+    }
+
     func testParseGitHubReleaseJSON() throws {
         let json = """
         {

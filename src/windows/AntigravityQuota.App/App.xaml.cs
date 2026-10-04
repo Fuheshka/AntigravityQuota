@@ -44,7 +44,7 @@ public partial class App : Application
 
         var loc = LocalizationManager.Instance;
         _startupManager = new StartupManager();
-        _updateChecker = new UpdateChecker();
+        _updateChecker = new UpdateChecker(currentVersion: UpdateChecker.ResolveCurrentVersion());
         _client = new QuotaClient();
         _history = new QuotaHistoryTracker();
         _pollingManager = new AdaptivePollingManager();

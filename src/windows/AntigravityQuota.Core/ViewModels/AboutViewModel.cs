@@ -29,8 +29,9 @@ public class AboutViewModel : INotifyPropertyChanged
     private string _copyStatusFeedback = string.Empty;
     private bool _hasCopyFeedback;
     private string _diagnosticReportText = string.Empty;
+    private readonly string _appVersion;
 
-    public string AppVersion => "1.0.0";
+    public string AppVersion => _appVersion;
     public string PlatformInfo => ".NET 9 • Windows x64";
     public string AuthorUrl => "https://github.com/Fuheshka";
     public string RepositoryUrl => "https://github.com/Fuheshka/AntigravityQuota";
@@ -112,13 +113,15 @@ public class AboutViewModel : INotifyPropertyChanged
         Action<string>? clipboardSetter = null,
         Action<string>? urlOpener = null,
         Func<ServerEndpoint?>? endpointResolver = null,
-        Func<QuotaSnapshot?>? snapshotResolver = null)
+        Func<QuotaSnapshot?>? snapshotResolver = null,
+        string? appVersion = null)
     {
         _loc = loc ?? LocalizationManager.Instance;
         _clipboardSetter = clipboardSetter;
         _urlOpener = urlOpener;
         _endpointResolver = endpointResolver;
         _snapshotResolver = snapshotResolver;
+        _appVersion = string.IsNullOrWhiteSpace(appVersion) ? UpdateChecker.ResolveCurrentVersion() : appVersion;
 
         CopyReportCommand = new RelayCommand(CopyReport);
         OpenGitHubCommand = new RelayCommand(() => OpenUrl(RepositoryUrl));

@@ -128,14 +128,109 @@ public enum UpdateCheckResult: Equatable, Sendable {
 /// Universal GitHub Release Update Checker.
 public struct UpdateChecker {
 
-    /// Finds the best matching asset for the target platform based on extension priorities.
+    /// Finds the best matching asset for the target platform based on extension priorities and platform filters.
+    /// Excludes foreign OS assets to prevent cross-platform download collisions.
     public static func findBestAsset(in assets: [GitHubAsset], for platform: SupportedPlatform) -> GitHubAsset? {
+        let valid = assets.filter { !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+        func isForeign(_ name: String, target: SupportedPlatform) -> Bool {
+            let lower = name.lowercased()
+            switch target {
+            case .macOS:
+                if lower.hasSuffix(".exe") || lower.hasSuffix(".msi") ||
+                   lower.hasSuffix(".appimage") || lower.hasSuffix(".deb") ||
+                   lower.hasSuffix(".rpm") || lower.hasSuffix(".apk") || lower.hasSuffix(".aab") {
+                    return true
+                }
+                if lower.contains("windows") || lower.contains("win32") || lower.contains("win64") ||
+                   lower.contains("linux") || lower.contains("ubuntu") || lower.contains("debian") ||
+                   lower.contains("android") {
+                    return true
+                }
+                if lower.contains("-win.") || lower.contains("-win-") ||
+                   lower.contains("_win.") || lower.contains("_win_") ||
+                   lower.contains(".win.") {
+                    return true
+                }
+                return false
+
+            case .windows:
+                if lower.hasSuffix(".dmg") || lower.hasSuffix(".pkg") ||
+                   lower.hasSuffix(".appimage") || lower.hasSuffix(".deb") ||
+                   lower.hasSuffix(".rpm") || lower.hasSuffix(".apk") || lower.hasSuffix(".aab") {
+                    return true
+                }
+                if lower.contains("macos") || lower.contains("darwin") || lower.contains("osx") ||
+                   lower.contains("apple") || lower.contains("linux") || lower.contains("ubuntu") ||
+                   lower.contains("debian") || lower.contains("android") {
+                    return true
+                }
+                if lower.contains("-mac.") || lower.contains("-mac-") ||
+                   lower.contains("_mac.") || lower.contains("_mac_") ||
+                   lower.contains(".mac.") {
+                    return true
+                }
+                return false
+
+            case .linux:
+                if lower.hasSuffix(".dmg") || lower.hasSuffix(".pkg") ||
+                   lower.hasSuffix(".exe") || lower.hasSuffix(".msi") ||
+                   lower.hasSuffix(".apk") || lower.hasSuffix(".aab") {
+                    return true
+                }
+                if lower.contains("macos") || lower.contains("darwin") || lower.contains("osx") ||
+                   lower.contains("windows") || lower.contains("android") {
+                    return true
+                }
+                return false
+
+            case .android:
+                if !lower.hasSuffix(".apk") && !lower.hasSuffix(".aab") {
+                    return true
+                }
+                return false
+            }
+        }
+
+        func hasPlatformAffinity(_ name: String, target: SupportedPlatform) -> Bool {
+            let lower = name.lowercased()
+            switch target {
+            case .macOS:
+                return lower.hasSuffix(".dmg") || lower.hasSuffix(".pkg") ||
+                       lower.contains("macos") || lower.contains("darwin") || lower.contains("osx") ||
+                       lower.contains("-mac.") || lower.contains("-mac-") || lower.contains("_mac.")
+            case .windows:
+                return lower.hasSuffix(".exe") || lower.hasSuffix(".msi") ||
+                       lower.contains("windows") || lower.contains("win32") || lower.contains("win64") ||
+                       lower.contains("win-x64") || lower.contains("win-arm64") ||
+                       lower.contains("-win.") || lower.contains("-win-") || lower.contains("_win.")
+            case .linux:
+                return lower.hasSuffix(".appimage") || lower.hasSuffix(".deb") || lower.hasSuffix(".rpm") ||
+                       lower.contains("linux") || lower.contains("ubuntu") || lower.contains("debian")
+            case .android:
+                return lower.hasSuffix(".apk") || lower.hasSuffix(".aab") || lower.contains("android")
+            }
+        }
+
+        let nonForeign = valid.filter { !isForeign($0.name, target: platform) }
+
+        // 1. Preferred pass: assets with explicit platform affinity matching preferred extensions
         let priorities = platform.preferredExtensions
         for ext in priorities {
-            if let match = assets.first(where: { $0.name.lowercased().hasSuffix(ext) }) {
+            if let match = nonForeign.first(where: {
+                $0.name.lowercased().hasSuffix(ext) && hasPlatformAffinity($0.name, target: platform)
+            }) {
                 return match
             }
         }
+
+        // 2. Generic pass: fallback to any non-foreign asset matching preferred extensions
+        for ext in priorities {
+            if let match = nonForeign.first(where: { $0.name.lowercased().hasSuffix(ext) }) {
+                return match
+            }
+        }
+
         return nil
     }
 

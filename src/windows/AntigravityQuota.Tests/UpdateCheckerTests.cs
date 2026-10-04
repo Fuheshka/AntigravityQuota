@@ -96,6 +96,14 @@ public class UpdateCheckerTests
         Assert.Equal(expected, result);
     }
 
+    [Fact]
+    public void DefaultVersion_MatchesCurrentRelease()
+    {
+        Assert.Equal("1.2.0", UpdateChecker.DefaultVersion);
+        using var checker = new UpdateChecker();
+        Assert.Equal("1.2.0", checker.CurrentVersion);
+    }
+
     #endregion
 
     #region Asset Prioritization Tests
@@ -134,6 +142,43 @@ public class UpdateCheckerTests
 
         var url = UpdateChecker.ResolveDownloadUrl(release);
         Assert.Equal("https://github.com/releases/download/v1.2.0/AntigravityQuota-win.zip", url);
+    }
+
+    [Fact]
+    public void ResolveDownloadUrl_IgnoresMacOsZip_AndPicksWindowsZip_InMultiplatformRelease()
+    {
+        var release = new GitHubReleaseInfo
+        {
+            TagName = "v1.2.0",
+            HtmlUrl = "https://github.com/Fuheshka/AntigravityQuota/releases/tag/v1.2.0",
+            Assets = new List<GitHubAsset>
+            {
+                new("AntigravityQuota-v1.2.0-macOS.dmg", "https://github.com/releases/download/v1.2.0/AntigravityQuota-v1.2.0-macOS.dmg"),
+                new("AntigravityQuota-v1.2.0-macOS.zip", "https://github.com/releases/download/v1.2.0/AntigravityQuota-v1.2.0-macOS.zip"),
+                new("AntigravityQuota-v1.2.0-windows-x64.zip", "https://github.com/releases/download/v1.2.0/AntigravityQuota-v1.2.0-windows-x64.zip")
+            }
+        };
+
+        var url = UpdateChecker.ResolveDownloadUrl(release);
+        Assert.Equal("https://github.com/releases/download/v1.2.0/AntigravityQuota-v1.2.0-windows-x64.zip", url);
+    }
+
+    [Fact]
+    public void ResolveDownloadUrl_WhenOnlyMacOsAssetsExist_FallsBackToReleasePageUrl()
+    {
+        var release = new GitHubReleaseInfo
+        {
+            TagName = "v1.2.1",
+            HtmlUrl = "https://github.com/Fuheshka/AntigravityQuota/releases/tag/v1.2.1",
+            Assets = new List<GitHubAsset>
+            {
+                new("AntigravityQuota-v1.2.1-macOS.dmg", "https://github.com/releases/download/v1.2.1/AntigravityQuota-v1.2.1-macOS.dmg"),
+                new("AntigravityQuota-v1.2.1-macOS.zip", "https://github.com/releases/download/v1.2.1/AntigravityQuota-v1.2.1-macOS.zip")
+            }
+        };
+
+        var url = UpdateChecker.ResolveDownloadUrl(release);
+        Assert.Equal("https://github.com/Fuheshka/AntigravityQuota/releases/tag/v1.2.1", url);
     }
 
     [Fact]

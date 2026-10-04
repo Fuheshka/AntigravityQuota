@@ -40,7 +40,7 @@ public static class DiagnosticReportGenerator
     public static string GenerateReport(
         ServerEndpoint? endpoint,
         QuotaSnapshot? snapshot,
-        string appVersion = "1.0.0",
+        string appVersion = "1.2.0",
         string? osDescription = null,
         DateTimeOffset? lastUpdate = null,
         DateTimeOffset? timestamp = null)

@@ -17,7 +17,7 @@ public class AboutViewModelTests
 
         var vm = new AboutViewModel(loc: loc);
 
-        Assert.Equal("1.0.0", vm.AppVersion);
+        Assert.Equal("1.2.0", vm.AppVersion);
         Assert.Equal(".NET 9 • Windows x64", vm.PlatformInfo);
         Assert.False(vm.IsConnected);
         Assert.Equal("Не обнаружено (ожидание среды)", vm.ConnectionStatusText);
