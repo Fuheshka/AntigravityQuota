@@ -307,7 +307,11 @@
                             Margin="0,0,0,4">
                             <ProgressBar.Template>
                                 <ControlTemplate TargetType="ProgressBar">
-                                    <Border Background="#24FFFFFF" CornerRadius="2.5" ClipToBounds="True">
+                                    <Border
+                                        x:Name="PART_Track"
+                                        Background="#24FFFFFF"
+                                        CornerRadius="2.5"
+                                        ClipToBounds="True">
                                         <Border
                                             x:Name="PART_Indicator"
                                             Background="{TemplateBinding Foreground}"
@@ -418,7 +422,11 @@
                             Margin="0,0,0,4">
                             <ProgressBar.Template>
                                 <ControlTemplate TargetType="ProgressBar">
-                                    <Border Background="#24FFFFFF" CornerRadius="2.5" ClipToBounds="True">
+                                    <Border
+                                        x:Name="PART_Track"
+                                        Background="#24FFFFFF"
+                                        CornerRadius="2.5"
+                                        ClipToBounds="True">
                                         <Border
                                             x:Name="PART_Indicator"
                                             Background="{TemplateBinding Foreground}"
@@ -670,7 +678,7 @@
                     <Button
                         Grid.Column="2"
                         Command="{Binding RefreshCommand}"
-                        Padding="6,3,6,3"
+                        Padding="7,3,7,3"
                         Background="#14FFFFFF"
                         BorderThickness="0"
                         Cursor="Hand"
@@ -684,19 +692,21 @@
                                     CornerRadius="4"
                                     Padding="{TemplateBinding Padding}">
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <TextBlock
-                                            x:Name="RefreshIcon"
-                                            Text="↻"
-                                            FontSize="11"
-                                            FontWeight="Bold"
-                                            Foreground="#CCFFFFFF"
-                                            Margin="0,0,4,0"
-                                            VerticalAlignment="Center"
-                                            RenderTransformOrigin="0.5,0.5">
-                                            <TextBlock.RenderTransform>
-                                                <RotateTransform Angle="0" />
-                                            </TextBlock.RenderTransform>
-                                        </TextBlock>
+                                        <Grid Width="12" Height="12" Margin="0,0,4,0" VerticalAlignment="Center">
+                                            <TextBlock
+                                                x:Name="RefreshIcon"
+                                                Text="↻"
+                                                FontSize="10.5"
+                                                FontWeight="Bold"
+                                                Foreground="#CCFFFFFF"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                RenderTransformOrigin="0.5,0.5">
+                                                <TextBlock.RenderTransform>
+                                                    <RotateTransform Angle="0" />
+                                                </TextBlock.RenderTransform>
+                                            </TextBlock>
+                                        </Grid>
                                         <TextBlock
                                             Text="{Binding Loc.RefreshShort}"
                                             FontSize="9.5"

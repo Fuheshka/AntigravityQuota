@@ -38,7 +38,7 @@ public class HudSettings
     /// <summary>
     /// Whether click-through mode (WS_EX_TRANSPARENT) is enabled, passing clicks to underlying code unless Alt is held.
     /// </summary>
-    public bool ClickThroughEnabled { get; set; } = true;
+    public bool ClickThroughEnabled { get; set; } = false;
 
     /// <summary>
     /// Whether global system hotkeys (Alt+Shift+Q, Alt+Shift+M, Alt+Shift+R) are enabled.

@@ -34,6 +34,9 @@ public partial class QuotaHudWindow : Window
         _hotkeyManager = hotkeyManager;
         DataContext = _viewModel;
 
+        CardView.SizeChanged += (s, e) => SyncHwndBounds();
+        PillView.SizeChanged += (s, e) => SyncHwndBounds();
+
         UpdateLayoutForMode(_viewModel.IsPillMode);
 
         _viewModel.PropertyChanged += (s, e) =>
@@ -195,8 +198,10 @@ public partial class QuotaHudWindow : Window
         else
         {
             targetW = 256;
-            targetH = CardView.ActualHeight > 0 ? CardView.ActualHeight : (ActualHeight > 0 ? ActualHeight : 185);
+            targetH = CardView.ActualHeight > 0 ? CardView.ActualHeight : (CardView.DesiredSize.Height > 0 ? CardView.DesiredSize.Height : ActualHeight);
         }
+
+        if (targetW <= 0 || targetH <= 0) return;
 
         int pixelW = (int)Math.Ceiling(targetW * dpiX);
         int pixelH = (int)Math.Ceiling(targetH * dpiY);

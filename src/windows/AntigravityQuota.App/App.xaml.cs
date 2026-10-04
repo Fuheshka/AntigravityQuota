@@ -191,15 +191,15 @@ public partial class App : Application
 
         try
         {
-            var iconUri = new Uri("pack://application:,,,/AntigravityQuota;component/Assets/app-icon.ico", UriKind.Absolute);
-            _notifyIcon.Icon = BitmapFrame.Create(iconUri);
+            var pngUri = new Uri("pack://application:,,,/Assets/app-icon.png", UriKind.Absolute);
+            _notifyIcon.Icon = new BitmapImage(pngUri);
         }
         catch
         {
             try
             {
-                var fallbackUri = new Uri("pack://application:,,,/Assets/app-icon.ico", UriKind.Absolute);
-                _notifyIcon.Icon = BitmapFrame.Create(fallbackUri);
+                var iconUri = new Uri("pack://application:,,,/AntigravityQuota;component/Assets/app-icon.ico", UriKind.Absolute);
+                _notifyIcon.Icon = BitmapFrame.Create(iconUri);
             }
             catch
             {

@@ -13,7 +13,7 @@ public class HudViewModel : FlyoutViewModel
     private bool _isPillMode;
     private bool _isSparklineExpanded;
     private bool _autoHideEnabled = true;
-    private bool _clickThroughEnabled = true;
+    private bool _clickThroughEnabled = false;
     private bool _hotkeysEnabled = true;
     private double? _windowX;
     private double? _windowY;
@@ -366,21 +366,34 @@ public class HudViewModel : FlyoutViewModel
         var gBurn = _history.CalculateBurnRate(QuotaPool.Gemini);
         var cBurn = _history.CalculateBurnRate(QuotaPool.Claude);
 
-        HasGeminiBurnRate = gBurn != null && (gBurn.Trend != QuotaTrend.Steady || gBurn.BurnRatePerHour != 0);
-        GeminiTrendArrow = gBurn?.Trend == QuotaTrend.Falling ? "↓" : (gBurn?.Trend == QuotaTrend.Rising ? "↑" : "");
+        HasGeminiBurnRate = true;
+        GeminiTrendArrow = gBurn?.Trend switch
+        {
+            QuotaTrend.Falling => "↓",
+            QuotaTrend.Rising => "↑",
+            _ => "→"
+        };
         GeminiTrendColor = GetTrendColor(gBurn?.Trend ?? QuotaTrend.Steady);
-        GeminiBurnRateFormatted = gBurn?.Formatted(Loc.IsRussian) ?? "";
+        GeminiBurnRateFormatted = gBurn?.Formatted(Loc.IsRussian) ?? (Loc.IsRussian ? "~0%/ч" : "~0%/h");
 
-        HasClaudeBurnRate = cBurn != null && (cBurn.Trend != QuotaTrend.Steady || cBurn.BurnRatePerHour != 0);
-        ClaudeTrendArrow = cBurn?.Trend == QuotaTrend.Falling ? "↓" : (cBurn?.Trend == QuotaTrend.Rising ? "↑" : "");
+        HasClaudeBurnRate = true;
+        ClaudeTrendArrow = cBurn?.Trend switch
+        {
+            QuotaTrend.Falling => "↓",
+            QuotaTrend.Rising => "↑",
+            _ => "→"
+        };
         ClaudeTrendColor = GetTrendColor(cBurn?.Trend ?? QuotaTrend.Steady);
-        ClaudeBurnRateFormatted = cBurn?.Formatted(Loc.IsRussian) ?? "";
+        ClaudeBurnRateFormatted = cBurn?.Formatted(Loc.IsRussian) ?? (Loc.IsRussian ? "~0%/ч" : "~0%/h");
+
+        var gPillTrend = gBurn?.Trend == QuotaTrend.Falling ? "↓" : (gBurn?.Trend == QuotaTrend.Rising ? "↑" : "");
+        var cPillTrend = cBurn?.Trend == QuotaTrend.Falling ? "↓" : (cBurn?.Trend == QuotaTrend.Rising ? "↑" : "");
 
         var gReset = snapshot.GeminiGroup?.FiveHourBucket?.TimeUntilReset;
         var gResetStr = gReset.HasValue && gReset.Value > TimeSpan.Zero
             ? $" {Loc.FormatResetCountdown(gReset.Value)}"
             : "";
-        PillGeminiText = $"G {GeminiFiveHourPct:F0}%{GeminiTrendArrow}{gResetStr}";
+        PillGeminiText = $"G {GeminiFiveHourPct:F0}%{gPillTrend}{gResetStr}";
         GeminiResetCountdownParentheses = gReset.HasValue && gReset.Value > TimeSpan.Zero
             ? $"({Loc.FormatResetCountdown(gReset.Value)})"
             : "";
@@ -389,7 +402,7 @@ public class HudViewModel : FlyoutViewModel
         var cResetStr = cReset.HasValue && cReset.Value > TimeSpan.Zero
             ? $" {Loc.FormatResetCountdown(cReset.Value)}"
             : "";
-        PillClaudeText = $"C {ClaudeFiveHourPct:F0}%{ClaudeTrendArrow}{cResetStr}";
+        PillClaudeText = $"C {ClaudeFiveHourPct:F0}%{cPillTrend}{cResetStr}";
         ClaudeResetCountdownParentheses = cReset.HasValue && cReset.Value > TimeSpan.Zero
             ? $"({Loc.FormatResetCountdown(cReset.Value)})"
             : "";

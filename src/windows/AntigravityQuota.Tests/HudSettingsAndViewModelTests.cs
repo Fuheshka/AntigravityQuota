@@ -38,7 +38,7 @@ public class HudSettingsAndViewModelTests : IDisposable
         Assert.False(settings.IsPillMode);
         Assert.False(settings.IsSparklineExpanded);
         Assert.True(settings.AutoHideEnabled);
-        Assert.True(settings.ClickThroughEnabled);
+        Assert.False(settings.ClickThroughEnabled);
     }
 
     [Fact]
@@ -53,7 +53,7 @@ public class HudSettingsAndViewModelTests : IDisposable
         Assert.True(settings.IsEnabled);
         Assert.False(settings.IsPillMode);
         Assert.True(settings.AutoHideEnabled);
-        Assert.True(settings.ClickThroughEnabled);
+        Assert.False(settings.ClickThroughEnabled);
     }
 
     [Fact]
@@ -322,6 +322,14 @@ public class HudSettingsAndViewModelTests : IDisposable
         Assert.StartsWith("↻", vm.GeminiWeeklyResetText);
         Assert.Contains("3д", vm.GeminiWeeklyResetText);
 
+        // Check burn rate parity: always visible when online
+        Assert.True(vm.HasGeminiBurnRate);
+        Assert.True(vm.HasClaudeBurnRate);
+        Assert.Equal("→", vm.GeminiTrendArrow);
+        Assert.Equal("→", vm.ClaudeTrendArrow);
+        Assert.Equal("~0%/ч", vm.GeminiBurnRateFormatted);
+        Assert.Equal("~0%/ч", vm.ClaudeBurnRateFormatted);
+
         // Check footer
         Assert.StartsWith(LocalizationManager.Instance.UpdatedAt, vm.FooterUpdatedText);
 
@@ -336,6 +344,12 @@ public class HudSettingsAndViewModelTests : IDisposable
         var vm = new HudViewModel(settingsPath: _tempSettingsFile);
         vm.UpdateFromSnapshot(null);
 
+        Assert.False(vm.HasGeminiBurnRate);
+        Assert.False(vm.HasClaudeBurnRate);
+        Assert.Equal("", vm.GeminiTrendArrow);
+        Assert.Equal("", vm.ClaudeTrendArrow);
+        Assert.Equal("", vm.GeminiBurnRateFormatted);
+        Assert.Equal("", vm.ClaudeBurnRateFormatted);
         Assert.Equal("", vm.GeminiResetCountdownParentheses);
         Assert.Equal("", vm.ClaudeResetCountdownParentheses);
         Assert.Equal("", vm.GeminiWeeklyResetText);
