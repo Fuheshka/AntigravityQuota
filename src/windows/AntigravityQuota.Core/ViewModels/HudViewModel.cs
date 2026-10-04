@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows.Input;
 using AntigravityQuota.Core.Models;
 
@@ -25,6 +26,24 @@ public class HudViewModel : FlyoutViewModel
     private string _pillCombinedText = "Offline";
     private string _pillGeminiColor = "#9CA3AF";
     private string _pillClaudeColor = "#9CA3AF";
+
+    private string _geminiResetCountdownParentheses = "";
+    private string _claudeResetCountdownParentheses = "";
+    private string _geminiWeeklyText = "Недельный: --%";
+    private string _claudeWeeklyText = "Недельный: --%";
+    private string _geminiWeeklyResetText = "";
+    private string _claudeWeeklyResetText = "";
+    private string _footerUpdatedText = "Обновлено в --:--";
+
+    private string _geminiTrendArrow = "";
+    private string _geminiTrendColor = "#F5A624";
+    private string _geminiBurnRateFormatted = "";
+    private bool _hasGeminiBurnRate = false;
+
+    private string _claudeTrendArrow = "";
+    private string _claudeTrendColor = "#F5A624";
+    private string _claudeBurnRateFormatted = "";
+    private bool _hasClaudeBurnRate = false;
 
     public HudViewModel(
         HudSettings? settings = null,
@@ -190,6 +209,99 @@ public class HudViewModel : FlyoutViewModel
         set => SetField(ref _pillClaudeColor, value);
     }
 
+    public string GeminiResetCountdownParentheses
+    {
+        get => _geminiResetCountdownParentheses;
+        set => SetField(ref _geminiResetCountdownParentheses, value);
+    }
+
+    public string ClaudeResetCountdownParentheses
+    {
+        get => _claudeResetCountdownParentheses;
+        set => SetField(ref _claudeResetCountdownParentheses, value);
+    }
+
+    public string GeminiWeeklyText
+    {
+        get => _geminiWeeklyText;
+        set => SetField(ref _geminiWeeklyText, value);
+    }
+
+    public string ClaudeWeeklyText
+    {
+        get => _claudeWeeklyText;
+        set => SetField(ref _claudeWeeklyText, value);
+    }
+
+    public string GeminiWeeklyResetText
+    {
+        get => _geminiWeeklyResetText;
+        set => SetField(ref _geminiWeeklyResetText, value);
+    }
+
+    public string ClaudeWeeklyResetText
+    {
+        get => _claudeWeeklyResetText;
+        set => SetField(ref _claudeWeeklyResetText, value);
+    }
+
+    public string FooterUpdatedText
+    {
+        get => _footerUpdatedText;
+        set => SetField(ref _footerUpdatedText, value);
+    }
+
+    public string GeminiTrendArrow
+    {
+        get => _geminiTrendArrow;
+        set => SetField(ref _geminiTrendArrow, value);
+    }
+
+    public string GeminiTrendColor
+    {
+        get => _geminiTrendColor;
+        set => SetField(ref _geminiTrendColor, value);
+    }
+
+    public string GeminiBurnRateFormatted
+    {
+        get => _geminiBurnRateFormatted;
+        set => SetField(ref _geminiBurnRateFormatted, value);
+    }
+
+    public bool HasGeminiBurnRate
+    {
+        get => _hasGeminiBurnRate;
+        set => SetField(ref _hasGeminiBurnRate, value);
+    }
+
+    public string ClaudeTrendArrow
+    {
+        get => _claudeTrendArrow;
+        set => SetField(ref _claudeTrendArrow, value);
+    }
+
+    public string ClaudeTrendColor
+    {
+        get => _claudeTrendColor;
+        set => SetField(ref _claudeTrendColor, value);
+    }
+
+    public string ClaudeBurnRateFormatted
+    {
+        get => _claudeBurnRateFormatted;
+        set => SetField(ref _claudeBurnRateFormatted, value);
+    }
+
+    public bool HasClaudeBurnRate
+    {
+        get => _hasClaudeBurnRate;
+        set => SetField(ref _hasClaudeBurnRate, value);
+    }
+
+    public string HudGeminiTitle => "Gemini";
+    public string HudClaudeTitle => "Claude / GPT";
+
     public ICommand TogglePillModeCommand { get; }
     public ICommand ToggleSparklineCommand { get; }
 
@@ -200,6 +312,16 @@ public class HudViewModel : FlyoutViewModel
         _settings.X = x;
         _settings.Y = y;
         HudSettingsManager.Save(_settings, _settingsPath);
+    }
+
+    public static string GetTrendColor(QuotaTrend trend)
+    {
+        return trend switch
+        {
+            QuotaTrend.Falling => "#F5A624", // Amber
+            QuotaTrend.Rising => "#34D399",  // Emerald
+            _ => "#80FFFFFF"                 // Muted
+        };
     }
 
     public static string GetStatusColor(double percentage)
@@ -220,6 +342,19 @@ public class HudViewModel : FlyoutViewModel
             PillCombinedText = Loc.StatusOffline;
             PillGeminiColor = "#9CA3AF";
             PillClaudeColor = "#9CA3AF";
+            GeminiResetCountdownParentheses = "";
+            ClaudeResetCountdownParentheses = "";
+            GeminiWeeklyText = $"{Loc.WeeklyLimit}: --%";
+            ClaudeWeeklyText = $"{Loc.WeeklyLimit}: --%";
+            GeminiWeeklyResetText = "";
+            ClaudeWeeklyResetText = "";
+            FooterUpdatedText = $"{Loc.UpdatedAt} --:--";
+            HasGeminiBurnRate = false;
+            GeminiTrendArrow = "";
+            GeminiBurnRateFormatted = "";
+            HasClaudeBurnRate = false;
+            ClaudeTrendArrow = "";
+            ClaudeBurnRateFormatted = "";
             return;
         }
 
@@ -228,18 +363,54 @@ public class HudViewModel : FlyoutViewModel
         GeminiBarColor = PillGeminiColor;
         ClaudeBarColor = PillClaudeColor;
 
+        var gBurn = _history.CalculateBurnRate(QuotaPool.Gemini);
+        var cBurn = _history.CalculateBurnRate(QuotaPool.Claude);
+
+        HasGeminiBurnRate = gBurn != null && (gBurn.Trend != QuotaTrend.Steady || gBurn.BurnRatePerHour != 0);
+        GeminiTrendArrow = gBurn?.Trend == QuotaTrend.Falling ? "↓" : (gBurn?.Trend == QuotaTrend.Rising ? "↑" : "");
+        GeminiTrendColor = GetTrendColor(gBurn?.Trend ?? QuotaTrend.Steady);
+        GeminiBurnRateFormatted = gBurn?.Formatted(Loc.IsRussian) ?? "";
+
+        HasClaudeBurnRate = cBurn != null && (cBurn.Trend != QuotaTrend.Steady || cBurn.BurnRatePerHour != 0);
+        ClaudeTrendArrow = cBurn?.Trend == QuotaTrend.Falling ? "↓" : (cBurn?.Trend == QuotaTrend.Rising ? "↑" : "");
+        ClaudeTrendColor = GetTrendColor(cBurn?.Trend ?? QuotaTrend.Steady);
+        ClaudeBurnRateFormatted = cBurn?.Formatted(Loc.IsRussian) ?? "";
+
         var gReset = snapshot.GeminiGroup?.FiveHourBucket?.TimeUntilReset;
         var gResetStr = gReset.HasValue && gReset.Value > TimeSpan.Zero
             ? $" {Loc.FormatResetCountdown(gReset.Value)}"
             : "";
-        PillGeminiText = $"G {GeminiFiveHourPct:F0}%{gResetStr}";
+        PillGeminiText = $"G {GeminiFiveHourPct:F0}%{GeminiTrendArrow}{gResetStr}";
+        GeminiResetCountdownParentheses = gReset.HasValue && gReset.Value > TimeSpan.Zero
+            ? $"({Loc.FormatResetCountdown(gReset.Value)})"
+            : "";
 
         var cReset = snapshot.ClaudeGroup?.FiveHourBucket?.TimeUntilReset;
         var cResetStr = cReset.HasValue && cReset.Value > TimeSpan.Zero
             ? $" {Loc.FormatResetCountdown(cReset.Value)}"
             : "";
-        PillClaudeText = $"C {ClaudeFiveHourPct:F0}%{cResetStr}";
+        PillClaudeText = $"C {ClaudeFiveHourPct:F0}%{ClaudeTrendArrow}{cResetStr}";
+        ClaudeResetCountdownParentheses = cReset.HasValue && cReset.Value > TimeSpan.Zero
+            ? $"({Loc.FormatResetCountdown(cReset.Value)})"
+            : "";
 
         PillCombinedText = $"{PillGeminiText} · {PillClaudeText}";
+
+        // Weekly Limit Lines: "Недельный: 4.3%"
+        GeminiWeeklyText = $"{Loc.WeeklyLimit}: {GeminiWeeklyPct.ToString("F1", CultureInfo.InvariantCulture)}%";
+        ClaudeWeeklyText = $"{Loc.WeeklyLimit}: {ClaudeWeeklyPct.ToString("F1", CultureInfo.InvariantCulture)}%";
+
+        var gWeekReset = snapshot.GeminiGroup?.WeeklyBucket?.TimeUntilReset;
+        GeminiWeeklyResetText = gWeekReset.HasValue && gWeekReset.Value > TimeSpan.Zero
+            ? $"↻ {Loc.FormatResetCountdown(gWeekReset.Value)}"
+            : "";
+
+        var cWeekReset = snapshot.ClaudeGroup?.WeeklyBucket?.TimeUntilReset;
+        ClaudeWeeklyResetText = cWeekReset.HasValue && cWeekReset.Value > TimeSpan.Zero
+            ? $"↻ {Loc.FormatResetCountdown(cWeekReset.Value)}"
+            : "";
+
+        // Footer: "Обновлено в 17:03"
+        FooterUpdatedText = $"{Loc.UpdatedAt} {DateTime.Now:HH:mm}";
     }
 }

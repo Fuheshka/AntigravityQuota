@@ -21,3 +21,4 @@ implementation-notes.md
 *.suo
 .vs/
 TestResults/
+PROMPT*.md

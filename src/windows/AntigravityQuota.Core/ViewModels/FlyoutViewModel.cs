@@ -11,7 +11,7 @@ public class FlyoutViewModel : INotifyPropertyChanged
 {
     private readonly LocalizationManager _loc;
     private readonly QuotaClient _client;
-    private readonly QuotaHistoryTracker _history;
+    protected readonly QuotaHistoryTracker _history;
     private readonly Func<Task>? _triggerRefreshCallback;
 
     private double _geminiFiveHourPct = 100.0;

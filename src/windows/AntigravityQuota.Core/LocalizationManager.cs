@@ -33,13 +33,16 @@ public class LocalizationManager
     public string StatusOnline => IsRussian ? "В сети" : "Online";
     public string StatusOffline => IsRussian ? "Оффлайн" : "Offline";
     public string WaitingForAntigravity => IsRussian ? "Ожидание запуска Antigravity..." : "Waiting for Antigravity...";
+    public string ServerOffline => WaitingForAntigravity;
     public string UpdatedAt => IsRussian ? "Обновлено в" : "Updated at";
+    public string UpdatedAtPrefix => IsRussian ? "Обновлено:" : "Updated:";
 
     // Pools & Meters
     public string GeminiPoolTitle => IsRussian ? "Пул Gemini (Flash / Pro)" : "Gemini Pool (Flash / Pro)";
     public string ClaudePoolTitle => IsRussian ? "Пул Claude и GPT-OSS" : "Claude & GPT-OSS Pool";
     public string FiveHourLimit => IsRussian ? "Лимит 5ч" : "5h Limit";
     public string WeeklyLimit => IsRussian ? "Недельный" : "Weekly";
+    public string WeeklyLimitFull => IsRussian ? "Недельный лимит" : "Weekly Limit";
     public string ResetsIn => IsRussian ? "сброс через" : "resets in";
     public string QuotaExhausted => IsRussian ? "Исчерпана" : "Exhausted";
     public string QuotaFull => IsRussian ? "100% Доступно" : "100% Available";
@@ -58,6 +61,7 @@ public class LocalizationManager
     public string MenuAbout => IsRussian ? "О программе..." : "About...";
     public string MenuExit => IsRussian ? "Выход" : "Exit";
     public string MenuRefreshNow => IsRussian ? "Обновить квоты" : "Refresh Quotas";
+    public string RefreshShort => IsRussian ? "Обновить" : "Refresh";
     public string MenuGlobalHotkeys => IsRussian ? "Горячие клавиши" : "Global Hotkeys";
 
     // Hotkey hints and gestures

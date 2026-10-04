@@ -1,6 +1,6 @@
 cask "antigravity-quota" do
   version "1.2.0"
-  sha256 "92bfacf84d587573184ad361c83ac0e7f70893ef6224ef709da4e66736c0aa67"
+  sha256 "96bf3cd3b2b684f5ecb979cc50b061bc79d48ac5acab74be076f5654d95a3281"
 
   url "https://github.com/Fuheshka/AntigravityQuota/releases/download/v#{version}/AntigravityQuota-v#{version}-macOS.dmg"
   name "Antigravity Quota"

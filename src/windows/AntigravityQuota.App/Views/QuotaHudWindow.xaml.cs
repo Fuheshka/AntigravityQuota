@@ -42,6 +42,13 @@ public partial class QuotaHudWindow : FluentWindow
             {
                 UpdateLayoutForMode(_viewModel.IsPillMode);
             }
+            else if (e.PropertyName == nameof(HudViewModel.IsSparklineExpanded) && !_viewModel.IsPillMode)
+            {
+                InvalidateMeasure();
+                UpdateLayout();
+                SyncHwndBounds();
+                Dispatcher.InvokeAsync(SyncHwndBounds, System.Windows.Threading.DispatcherPriority.Loaded);
+            }
             else if (e.PropertyName == nameof(HudViewModel.ClickThroughEnabled))
             {
                 UpdateClickThrough();
@@ -133,7 +140,8 @@ public partial class QuotaHudWindow : FluentWindow
             UpdateClickThrough();
         }
 
-        // 5. Restore saved position or default to top-right corner
+        // 5. Apply layout mode and restore saved position
+        UpdateLayoutForMode(_viewModel.IsPillMode);
         RestorePosition();
         _isInitialized = true;
     }
@@ -150,20 +158,61 @@ public partial class QuotaHudWindow : FluentWindow
         return nint.Zero;
     }
 
-    private void UpdateLayoutForMode(bool isPill)
+    public void UpdateLayoutForMode(bool isPill)
     {
         if (isPill)
         {
-            SizeToContent = SizeToContent.Manual;
-            Width = 260;
-            Height = 40;
+            Width = double.NaN;
+            Height = double.NaN;
+            SizeToContent = SizeToContent.WidthAndHeight;
         }
         else
         {
-            Width = 320;
+            Width = 256;
             Height = double.NaN;
             SizeToContent = SizeToContent.Height;
         }
+
+        InvalidateMeasure();
+        UpdateLayout();
+
+        SyncHwndBounds();
+        Dispatcher.InvokeAsync(SyncHwndBounds, System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    private void SyncHwndBounds()
+    {
+        if (_hwnd == nint.Zero) return;
+
+        var dpi = VisualTreeHelper.GetDpi(this);
+        double dpiX = dpi.DpiScaleX > 0 ? dpi.DpiScaleX : 1.0;
+        double dpiY = dpi.DpiScaleY > 0 ? dpi.DpiScaleY : 1.0;
+
+        double targetW;
+        double targetH;
+
+        if (_viewModel.IsPillMode)
+        {
+            targetW = PillView.ActualWidth > 0 ? PillView.ActualWidth : (DesiredSize.Width > 0 ? DesiredSize.Width : 230);
+            targetH = PillView.ActualHeight > 0 ? PillView.ActualHeight : 32;
+        }
+        else
+        {
+            targetW = 256;
+            targetH = CardView.ActualHeight > 0 ? CardView.ActualHeight : (ActualHeight > 0 ? ActualHeight : 185);
+        }
+
+        int pixelW = (int)Math.Ceiling(targetW * dpiX);
+        int pixelH = (int)Math.Ceiling(targetH * dpiY);
+
+        Win32Interop.SetWindowPos(
+            _hwnd,
+            nint.Zero,
+            0,
+            0,
+            pixelW,
+            pixelH,
+            Win32Interop.SWP_NOACTIVATE | Win32Interop.SWP_NOMOVE | Win32Interop.SWP_NOZORDER | Win32Interop.SWP_FRAMECHANGED);
     }
 
     private void RestorePosition()
@@ -178,8 +227,8 @@ public partial class QuotaHudWindow : FluentWindow
             var clamped = HudSettingsManager.ClampPosition(
                 _viewModel.WindowX.Value,
                 _viewModel.WindowY.Value,
-                Width > 0 ? Width : 260,
-                Height > 0 ? Height : 40,
+                Width > 0 ? Width : 256,
+                Height > 0 ? Height : 32,
                 screenLeft,
                 screenTop,
                 screenWidth,
@@ -191,7 +240,7 @@ public partial class QuotaHudWindow : FluentWindow
         else
         {
             // Default position: top-right corner of primary work area
-            Left = SystemParameters.WorkArea.Right - (Width > 0 ? Width : 260) - 24;
+            Left = SystemParameters.WorkArea.Right - 256 - 24;
             Top = SystemParameters.WorkArea.Top + 36;
             _viewModel.SavePosition(Left, Top);
         }

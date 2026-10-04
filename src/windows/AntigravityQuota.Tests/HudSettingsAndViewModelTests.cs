@@ -282,4 +282,66 @@ public class HudSettingsAndViewModelTests : IDisposable
         var loaded = HudSettingsManager.Load(_tempSettingsFile);
         Assert.False(loaded.HotkeysEnabled);
     }
+
+    [Fact]
+    public void HudViewModel_Titles_MatchMacOSParity()
+    {
+        var vm = new HudViewModel(settingsPath: _tempSettingsFile);
+        Assert.Equal("Gemini", vm.HudGeminiTitle);
+        Assert.Equal("Claude / GPT", vm.HudClaudeTitle);
+    }
+
+    [Fact]
+    public void HudViewModel_UpdateFromSnapshot_PopulatesHudCardAndPillParity()
+    {
+        var history = new QuotaHistoryTracker();
+        var vm = new HudViewModel(history: history, settingsPath: _tempSettingsFile);
+
+        var g5h = new QuotaBucket("gemini-5h", "5h", 0.854, DateTimeOffset.UtcNow.AddHours(1).AddMinutes(12));
+        var gWeek = new QuotaBucket("gemini-weekly", "weekly", 0.920, DateTimeOffset.UtcNow.AddDays(3).AddHours(4));
+        var geminiGroup = new QuotaGroup("gemini", new[] { g5h, gWeek });
+
+        var c5h = new QuotaBucket("claude-5h", "5h", 1.0, null);
+        var cWeek = new QuotaBucket("claude-weekly", "weekly", 1.0, null);
+        var claudeGroup = new QuotaGroup("claude", new[] { c5h, cWeek });
+
+        var snapshot = new QuotaSnapshot(new[] { geminiGroup, claudeGroup }, Array.Empty<ModelConfig>());
+
+        // 1. Initial snapshot
+        vm.UpdateFromSnapshot(snapshot);
+
+        // Check countdown parentheses
+        Assert.StartsWith("(", vm.GeminiResetCountdownParentheses);
+        Assert.EndsWith(")", vm.GeminiResetCountdownParentheses);
+        Assert.Contains("1ч", vm.GeminiResetCountdownParentheses);
+        Assert.Equal("", vm.ClaudeResetCountdownParentheses);
+
+        // Check weekly lines
+        Assert.Contains("92.0%", vm.GeminiWeeklyText);
+        Assert.Contains("100.0%", vm.ClaudeWeeklyText);
+        Assert.StartsWith("↻", vm.GeminiWeeklyResetText);
+        Assert.Contains("3д", vm.GeminiWeeklyResetText);
+
+        // Check footer
+        Assert.StartsWith(LocalizationManager.Instance.UpdatedAt, vm.FooterUpdatedText);
+
+        // Check pill mode text
+        Assert.Contains("G 85%", vm.PillGeminiText);
+        Assert.Contains("C 100%", vm.PillClaudeText);
+    }
+
+    [Fact]
+    public void HudViewModel_UpdateFromSnapshot_NullSnapshot_ResetsHudCardFields()
+    {
+        var vm = new HudViewModel(settingsPath: _tempSettingsFile);
+        vm.UpdateFromSnapshot(null);
+
+        Assert.Equal("", vm.GeminiResetCountdownParentheses);
+        Assert.Equal("", vm.ClaudeResetCountdownParentheses);
+        Assert.Equal("", vm.GeminiWeeklyResetText);
+        Assert.Equal("", vm.ClaudeWeeklyResetText);
+        Assert.Contains("--%", vm.GeminiWeeklyText);
+        Assert.Contains("--%", vm.ClaudeWeeklyText);
+        Assert.StartsWith(LocalizationManager.Instance.UpdatedAt, vm.FooterUpdatedText);
+    }
 }
