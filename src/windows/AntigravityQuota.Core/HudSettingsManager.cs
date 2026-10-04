@@ -33,8 +33,10 @@ public static class HudSettingsManager
             }
 
             var json = File.ReadAllText(path);
-            var settings = JsonSerializer.Deserialize<HudSettings>(json, JsonOptions);
-            return settings ?? new HudSettings();
+            var settings = JsonSerializer.Deserialize<HudSettings>(json, JsonOptions) ?? new HudSettings();
+            // Force ClickThroughEnabled to false so user never gets locked out of interacting with HUD
+            settings.ClickThroughEnabled = false;
+            return settings;
         }
         catch
         {

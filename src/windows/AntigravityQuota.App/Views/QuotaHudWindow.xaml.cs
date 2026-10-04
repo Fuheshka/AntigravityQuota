@@ -3,6 +3,9 @@ using System.Windows;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
+using MouseEventArgs = System.Windows.Input.MouseEventArgs;
+using MouseButtonEventArgs = System.Windows.Input.MouseButtonEventArgs;
+using ButtonBase = System.Windows.Controls.Primitives.ButtonBase;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using AntigravityQuota.App.Services;
@@ -20,7 +23,6 @@ public partial class QuotaHudWindow : Window
     private nint _hwnd = nint.Zero;
     private bool _isInitialized = false;
     private bool _isAltPressed = false;
-    private bool _deferRestoreClickThrough = false;
     private bool _isFadingOut = false;
 
     public QuotaHudWindow(
@@ -36,6 +38,7 @@ public partial class QuotaHudWindow : Window
 
         CardView.SizeChanged += (s, e) => SyncHwndBounds();
         PillView.SizeChanged += (s, e) => SyncHwndBounds();
+        Loaded += (s, e) => RestorePosition();
 
         UpdateLayoutForMode(_viewModel.IsPillMode);
 
@@ -119,14 +122,11 @@ public partial class QuotaHudWindow : Window
         {
             _hwnd = helper.Handle;
 
-            // 1. Apply Win32 Extended Styles: ToolWindow, TopMost, NoActivate
+            // 1. Apply Win32 Extended Styles: ToolWindow, TopMost
             Win32Interop.ApplyHudWindowStyles(_hwnd);
 
-            // 2. Intercept WM_MOUSEACTIVATE to prevent stealing keyboard focus from active IDE
+            // 2. Hook global hotkeys (WM_HOTKEY) and register Alt+Shift+Q / M / R
             var source = HwndSource.FromHwnd(_hwnd);
-            source?.AddHook(WndProc);
-
-            // 3. Hook global hotkeys (WM_HOTKEY) and register Alt+Shift+Q / M / R
             if (_hotkeyManager != null)
             {
                 source?.AddHook(_hotkeyManager.HookCallback);
@@ -136,26 +136,14 @@ public partial class QuotaHudWindow : Window
                 }
             }
 
-            // 4. Initialize click-through state
+            // 3. Initialize click-through state
             UpdateClickThrough();
         }
 
-        // 5. Apply layout mode and restore saved position
+        // 4. Apply layout mode and restore saved position
         UpdateLayoutForMode(_viewModel.IsPillMode);
         RestorePosition();
         _isInitialized = true;
-    }
-
-    private nint WndProc(nint hwnd, int msg, nint wParam, nint lParam, ref bool handled)
-    {
-        if (msg == Win32Interop.WM_MOUSEACTIVATE)
-        {
-            // Signal to Windows: do not activate window and do not eat the click
-            handled = true;
-            return Win32Interop.MA_NOACTIVATE;
-        }
-
-        return nint.Zero;
     }
 
     public void UpdateLayoutForMode(bool isPill)
@@ -223,6 +211,9 @@ public partial class QuotaHudWindow : Window
         double screenWidth = SystemParameters.VirtualScreenWidth;
         double screenHeight = SystemParameters.VirtualScreenHeight;
 
+        double targetX;
+        double targetY;
+
         if (_viewModel.WindowX.HasValue && _viewModel.WindowY.HasValue)
         {
             var clamped = HudSettingsManager.ClampPosition(
@@ -235,44 +226,43 @@ public partial class QuotaHudWindow : Window
                 screenWidth,
                 screenHeight);
 
-            Left = clamped.X;
-            Top = clamped.Y;
+            targetX = clamped.X;
+            targetY = clamped.Y;
         }
         else
         {
             // Default position: top-right corner of primary work area
-            Left = SystemParameters.WorkArea.Right - 256 - 24;
-            Top = SystemParameters.WorkArea.Top + 36;
-            _viewModel.SavePosition(Left, Top);
+            targetX = SystemParameters.WorkArea.Right - 256 - 24;
+            targetY = SystemParameters.WorkArea.Top + 36;
+            _viewModel.SavePosition(targetX, targetY);
+        }
+
+        Left = targetX;
+        Top = targetY;
+
+        if (_hwnd != nint.Zero)
+        {
+            var dpi = VisualTreeHelper.GetDpi(this);
+            double dpiX = dpi.DpiScaleX > 0 ? dpi.DpiScaleX : 1.0;
+            double dpiY = dpi.DpiScaleY > 0 ? dpi.DpiScaleY : 1.0;
+            int pixelX = (int)Math.Round(targetX * dpiX);
+            int pixelY = (int)Math.Round(targetY * dpiY);
+
+            Win32Interop.SetWindowPos(
+                _hwnd,
+                nint.Zero,
+                pixelX,
+                pixelY,
+                0,
+                0,
+                Win32Interop.SWP_NOACTIVATE | Win32Interop.SWP_NOSIZE | Win32Interop.SWP_NOZORDER | Win32Interop.SWP_FRAMECHANGED);
         }
     }
 
     private void UpdateClickThrough()
     {
         if (_hwnd == nint.Zero) return;
-
-        if (!_viewModel.ClickThroughEnabled)
-        {
-            Win32Interop.SetClickThrough(_hwnd, false);
-            return;
-        }
-
-        if (_isAltPressed)
-        {
-            // Alt is held down: temporarily remove WS_EX_TRANSPARENT so user can drag or interact
-            Win32Interop.SetClickThrough(_hwnd, false);
-        }
-        else
-        {
-            // Alt released: if mouse left button is currently pressed (dragging), defer restoring click-through
-            if (Mouse.LeftButton == MouseButtonState.Pressed)
-            {
-                _deferRestoreClickThrough = true;
-                return;
-            }
-
-            Win32Interop.SetClickThrough(_hwnd, true);
-        }
+        Win32Interop.SetClickThrough(_hwnd, _viewModel.ClickThroughEnabled);
     }
 
     public void AnimateFadeIn()
@@ -318,38 +308,64 @@ public partial class QuotaHudWindow : Window
         BeginAnimation(OpacityProperty, anim);
     }
 
+    private Win32Interop.POINT _dragStartCursorPhysical;
+    private double _dragStartLeftDip;
+    private double _dragStartTopDip;
+    private bool _isDragging = false;
+
     private void OnRootMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        // If clicking on a button, allow button click to execute normally
+        // If clicking on an interactive control, allow it to execute normally
         if (e.OriginalSource is DependencyObject dep && FindVisualParent<ButtonBase>(dep) != null)
         {
             return;
         }
 
-        if (e.ButtonState == MouseButtonState.Pressed)
+        if (e.ChangedButton == MouseButton.Left)
         {
-            double startLeft = Left;
-            double startTop = Top;
+            _isDragging = true;
+            Win32Interop.GetCursorPos(out _dragStartCursorPhysical);
+            _dragStartLeftDip = Left;
+            _dragStartTopDip = Top;
+            CaptureMouse();
+            e.Handled = true;
+        }
+    }
 
-            try
-            {
-                DragMove();
-            }
-            catch (InvalidOperationException)
-            {
-                // Suppress mouse state race conditions
-            }
-            finally
-            {
-                if (_deferRestoreClickThrough && !_isAltPressed)
-                {
-                    _deferRestoreClickThrough = false;
-                    Win32Interop.SetClickThrough(_hwnd, true);
-                }
-            }
+    private void OnRootMouseMove(object sender, MouseEventArgs e)
+    {
+        if (_isDragging && e.LeftButton == MouseButtonState.Pressed)
+        {
+            Win32Interop.GetCursorPos(out var curPhysical);
+            var dpi = VisualTreeHelper.GetDpi(this);
+            double dpiX = dpi.DpiScaleX > 0 ? dpi.DpiScaleX : 1.0;
+            double dpiY = dpi.DpiScaleY > 0 ? dpi.DpiScaleY : 1.0;
 
-            // If dragged significantly, persist new coordinates
-            if (Math.Abs(Left - startLeft) > 2 || Math.Abs(Top - startTop) > 2)
+            double deltaDipX = (curPhysical.X - _dragStartCursorPhysical.X) / dpiX;
+            double deltaDipY = (curPhysical.Y - _dragStartCursorPhysical.Y) / dpiY;
+
+            Left = _dragStartLeftDip + deltaDipX;
+            Top = _dragStartTopDip + deltaDipY;
+        }
+    }
+
+    private void OnRootMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (_isDragging)
+        {
+            _isDragging = false;
+            ReleaseMouseCapture();
+            e.Handled = true;
+
+            Win32Interop.GetCursorPos(out var curPhysical);
+            var dpi = VisualTreeHelper.GetDpi(this);
+            double dpiX = dpi.DpiScaleX > 0 ? dpi.DpiScaleX : 1.0;
+            double dpiY = dpi.DpiScaleY > 0 ? dpi.DpiScaleY : 1.0;
+
+            double deltaDipX = (curPhysical.X - _dragStartCursorPhysical.X) / dpiX;
+            double deltaDipY = (curPhysical.Y - _dragStartCursorPhysical.Y) / dpiY;
+
+            if (Math.Abs(deltaDipX) > 4 || Math.Abs(deltaDipY) > 4)
             {
                 _viewModel.SavePosition(Left, Top);
             }

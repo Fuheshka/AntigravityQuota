@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
@@ -7,7 +8,14 @@ using AntigravityQuota.App.Views;
 using AntigravityQuota.Core.ViewModels;
 using AntigravityQuota.Core.Models;
 using AntigravityQuota.Core;
-using Wpf.Ui.Tray.Controls;
+using Application = System.Windows.Application;
+using Clipboard = System.Windows.Clipboard;
+using MessageBox = System.Windows.MessageBox;
+using FormsNotifyIcon = System.Windows.Forms.NotifyIcon;
+using FormsContextMenuStrip = System.Windows.Forms.ContextMenuStrip;
+using FormsToolStripMenuItem = System.Windows.Forms.ToolStripMenuItem;
+using FormsToolStripSeparator = System.Windows.Forms.ToolStripSeparator;
+using FormsMouseButtons = System.Windows.Forms.MouseButtons;
 
 namespace AntigravityQuota.App;
 
@@ -24,7 +32,7 @@ public partial class App : Application
     private QuotaSnapshot? _latestSnapshot;
     private WindowContextTracker? _tracker;
     private GlobalHotkeyManager? _hotkeyManager;
-    private NotifyIcon? _notifyIcon;
+    private FormsNotifyIcon? _notifyIcon;
 
     private QuotaClient? _client;
     private QuotaHistoryTracker? _history;
@@ -65,7 +73,7 @@ public partial class App : Application
                         _aboutViewModel?.UpdateState(_client.CachedEndpoint, snap, snap?.UpdatedAt);
                         if (_notifyIcon != null && _viewModel != null)
                         {
-                            _notifyIcon.TooltipText = _viewModel.TrayTooltipText;
+                            _notifyIcon.Text = TruncateTooltip(_viewModel.TrayTooltipText);
                         }
                     });
                 });
@@ -180,127 +188,158 @@ public partial class App : Application
         _ = RunBackgroundUpdateCheckAsync(_cts.Token);
     }
 
+    private static string TruncateTooltip(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return "AntigravityQuota";
+        return text.Length > 63 ? text.Substring(0, 60) + "..." : text;
+    }
+
     private void SetupNotifyIcon(LocalizationManager loc)
     {
-        _notifyIcon = new NotifyIcon
+        _notifyIcon = new FormsNotifyIcon
         {
-            FocusOnLeftClick = false,
-            MenuOnRightClick = true,
-            TooltipText = _viewModel?.TrayTooltipText ?? "AntigravityQuota"
+            Visible = true,
+            Text = TruncateTooltip(_viewModel?.TrayTooltipText ?? "AntigravityQuota")
         };
 
         try
         {
-            var pngUri = new Uri("pack://application:,,,/Assets/app-icon.png", UriKind.Absolute);
-            _notifyIcon.Icon = new BitmapImage(pngUri);
+            var exePath = Process.GetCurrentProcess().MainModule?.FileName;
+            if (!string.IsNullOrEmpty(exePath) && File.Exists(exePath))
+            {
+                _notifyIcon.Icon = System.Drawing.Icon.ExtractAssociatedIcon(exePath);
+            }
         }
         catch
         {
+            // Fallback handled below
+        }
+
+        if (_notifyIcon.Icon == null)
+        {
             try
             {
-                var iconUri = new Uri("pack://application:,,,/AntigravityQuota;component/Assets/app-icon.ico", UriKind.Absolute);
-                _notifyIcon.Icon = BitmapFrame.Create(iconUri);
+                var sri = Application.GetResourceStream(new Uri("pack://application:,,,/Assets/app.ico", UriKind.Absolute))
+                       ?? Application.GetResourceStream(new Uri("pack://application:,,,/Assets/app-icon.ico", UriKind.Absolute));
+                if (sri != null)
+                {
+                    _notifyIcon.Icon = new System.Drawing.Icon(sri.Stream);
+                }
             }
             catch
             {
-                // Fallback handled by Hicon.FromApp()
+                _notifyIcon.Icon = System.Drawing.SystemIcons.Application;
             }
         }
 
         // Left click on tray toggles the FlyoutWindow
-#pragma warning disable CS8622
-        _notifyIcon.LeftClick += (s, e) => ToggleFlyout();
-#pragma warning restore CS8622
+        _notifyIcon.MouseClick += (s, e) =>
+        {
+            if (e.Button == FormsMouseButtons.Left)
+            {
+                Dispatcher.Invoke(() => ToggleFlyout());
+            }
+        };
 
         // Context menu on right click
-        var contextMenu = new ContextMenu();
+        var contextMenu = new FormsContextMenuStrip();
 
         // 1. Включить HUD (Checkable)
-        var hudItem = new MenuItem
+        var hudItem = new FormsToolStripMenuItem(loc.MenuEnableHUD)
         {
-            Header = loc.MenuEnableHUD,
-            InputGestureText = loc.HotkeyHintToggleHud,
-            IsCheckable = true,
-            IsChecked = _hudViewModel?.IsEnabled ?? true
+            CheckOnClick = true,
+            Checked = _hudViewModel?.IsEnabled ?? true,
+            ShortcutKeyDisplayString = loc.HotkeyHintToggleHud
         };
         hudItem.Click += (s, e) =>
         {
-            if (_hudWindow != null && _hudViewModel != null)
+            Dispatcher.Invoke(() =>
             {
-                if (hudItem.IsChecked)
+                if (_hudWindow != null && _hudViewModel != null)
                 {
-                    _hudWindow.ShowHud();
+                    if (hudItem.Checked)
+                    {
+                        _hudWindow.ShowHud();
+                    }
+                    else
+                    {
+                        _hudWindow.HideHud();
+                    }
                 }
-                else
-                {
-                    _hudWindow.HideHud();
-                }
-            }
+            });
         };
         contextMenu.Items.Add(hudItem);
 
         // 2. Режим таблетки (Checkable)
-        var pillItem = new MenuItem
+        var pillItem = new FormsToolStripMenuItem(loc.MenuCompactPillMode)
         {
-            Header = loc.MenuCompactPillMode,
-            InputGestureText = loc.HotkeyHintTogglePill,
-            IsCheckable = true,
-            IsChecked = _hudViewModel?.IsPillMode ?? false
+            CheckOnClick = true,
+            Checked = _hudViewModel?.IsPillMode ?? false,
+            ShortcutKeyDisplayString = loc.HotkeyHintTogglePill
         };
         pillItem.Click += (s, e) =>
         {
-            if (_hudViewModel != null)
+            Dispatcher.Invoke(() =>
             {
-                _hudViewModel.IsPillMode = pillItem.IsChecked;
-            }
+                if (_hudViewModel != null)
+                {
+                    _hudViewModel.IsPillMode = pillItem.Checked;
+                }
+            });
         };
         contextMenu.Items.Add(pillItem);
 
         // 3. Автоскрытие HUD (Checkable)
-        var autoHideItem = new MenuItem
+        var autoHideItem = new FormsToolStripMenuItem(loc.MenuAutoHideHUD)
         {
-            Header = loc.MenuAutoHideHUD,
-            IsCheckable = true,
-            IsChecked = _hudViewModel?.AutoHideEnabled ?? true
+            CheckOnClick = true,
+            Checked = _hudViewModel?.AutoHideEnabled ?? true
         };
         autoHideItem.Click += (s, e) =>
         {
-            if (_hudViewModel != null)
+            Dispatcher.Invoke(() =>
             {
-                _hudViewModel.AutoHideEnabled = autoHideItem.IsChecked;
-            }
+                if (_hudViewModel != null)
+                {
+                    _hudViewModel.AutoHideEnabled = autoHideItem.Checked;
+                }
+            });
         };
         contextMenu.Items.Add(autoHideItem);
 
         // 4. Сквозной клик (Checkable)
-        var clickThroughItem = new MenuItem
+        var clickThroughItem = new FormsToolStripMenuItem(loc.MenuClickThrough)
         {
-            Header = loc.MenuClickThrough,
-            IsCheckable = true,
-            IsChecked = _hudViewModel?.ClickThroughEnabled ?? true
+            CheckOnClick = true,
+            Checked = _hudViewModel?.ClickThroughEnabled ?? false
         };
         clickThroughItem.Click += (s, e) =>
         {
-            if (_hudViewModel != null)
+            Dispatcher.Invoke(() =>
             {
-                _hudViewModel.ClickThroughEnabled = clickThroughItem.IsChecked;
-            }
+                if (_hudViewModel != null)
+                {
+                    _hudViewModel.ClickThroughEnabled = clickThroughItem.Checked;
+                }
+            });
         };
         contextMenu.Items.Add(clickThroughItem);
 
         // 5. Глобальные горячие клавиши (Checkable)
-        var hotkeysItem = new MenuItem
+        var hotkeysItem = new FormsToolStripMenuItem(loc.MenuGlobalHotkeys)
         {
-            Header = loc.MenuGlobalHotkeys,
-            IsCheckable = true,
-            IsChecked = _hudViewModel?.HotkeysEnabled ?? true
+            CheckOnClick = true,
+            Checked = _hudViewModel?.HotkeysEnabled ?? true
         };
         hotkeysItem.Click += (s, e) =>
         {
-            if (_hudViewModel != null)
+            Dispatcher.Invoke(() =>
             {
-                _hudViewModel.HotkeysEnabled = hotkeysItem.IsChecked;
-            }
+                if (_hudViewModel != null)
+                {
+                    _hudViewModel.HotkeysEnabled = hotkeysItem.Checked;
+                }
+            });
         };
         contextMenu.Items.Add(hotkeysItem);
 
@@ -312,59 +351,56 @@ public partial class App : Application
                 {
                     if (e.PropertyName == nameof(HudViewModel.IsPillMode))
                     {
-                        pillItem.IsChecked = _hudViewModel.IsPillMode;
+                        pillItem.Checked = _hudViewModel.IsPillMode;
                     }
                     else if (e.PropertyName == nameof(HudViewModel.IsEnabled))
                     {
-                        hudItem.IsChecked = _hudViewModel.IsEnabled;
+                        hudItem.Checked = _hudViewModel.IsEnabled;
                     }
                     else if (e.PropertyName == nameof(HudViewModel.AutoHideEnabled))
                     {
-                        autoHideItem.IsChecked = _hudViewModel.AutoHideEnabled;
+                        autoHideItem.Checked = _hudViewModel.AutoHideEnabled;
                     }
                     else if (e.PropertyName == nameof(HudViewModel.ClickThroughEnabled))
                     {
-                        clickThroughItem.IsChecked = _hudViewModel.ClickThroughEnabled;
+                        clickThroughItem.Checked = _hudViewModel.ClickThroughEnabled;
                     }
                     else if (e.PropertyName == nameof(HudViewModel.HotkeysEnabled))
                     {
-                        hotkeysItem.IsChecked = _hudViewModel.HotkeysEnabled;
+                        hotkeysItem.Checked = _hudViewModel.HotkeysEnabled;
                     }
                 });
             };
         }
 
-        contextMenu.Items.Add(new Separator());
+        contextMenu.Items.Add(new FormsToolStripSeparator());
 
         // 6. Запускать при старте Windows (Checkable)
-        var startupItem = new MenuItem
+        var startupItem = new FormsToolStripMenuItem(loc.MenuLaunchAtStartup)
         {
-            Header = loc.MenuLaunchAtStartup,
-            IsCheckable = true,
-            IsChecked = _startupManager?.IsEnabled() ?? false
+            CheckOnClick = true,
+            Checked = _startupManager?.IsEnabled() ?? false
         };
         startupItem.Click += (s, e) =>
         {
             if (_startupManager != null)
             {
-                bool newState = startupItem.IsChecked;
+                bool newState = startupItem.Checked;
                 bool success = _startupManager.SetEnabled(newState);
                 if (!success)
                 {
-                    // Revert checkbox state if registry write failed
-                    startupItem.IsChecked = _startupManager.IsEnabled();
+                    startupItem.Checked = _startupManager.IsEnabled();
                 }
             }
         };
         contextMenu.Items.Add(startupItem);
 
-        contextMenu.Items.Add(new Separator());
+        contextMenu.Items.Add(new FormsToolStripSeparator());
 
         // 7. Обновить квоты
-        var refreshItem = new MenuItem
+        var refreshItem = new FormsToolStripMenuItem(loc.MenuRefreshNow)
         {
-            Header = loc.MenuRefreshNow,
-            InputGestureText = loc.HotkeyHintRefresh
+            ShortcutKeyDisplayString = loc.HotkeyHintRefresh
         };
         refreshItem.Click += async (s, e) =>
         {
@@ -376,59 +412,40 @@ public partial class App : Application
         contextMenu.Items.Add(refreshItem);
 
         // 8. Проверить обновления...
-        var updateItem = new MenuItem
-        {
-            Header = loc.MenuCheckUpdates
-        };
+        var updateItem = new FormsToolStripMenuItem(loc.MenuCheckUpdates);
         updateItem.Click += async (s, e) =>
         {
             await CheckForUpdatesManualAsync();
         };
         contextMenu.Items.Add(updateItem);
 
-        // 4. Настройки
-        var settingsItem = new MenuItem
-        {
-            Header = loc.MenuSettings
-        };
+        // 9. Настройки
+        var settingsItem = new FormsToolStripMenuItem(loc.MenuSettings);
         settingsItem.Click += (s, e) =>
         {
-            ToggleFlyout();
+            Dispatcher.Invoke(() => ToggleFlyout());
         };
         contextMenu.Items.Add(settingsItem);
 
-        // 5. О программе
-        var aboutItem = new MenuItem
-        {
-            Header = loc.MenuAbout
-        };
+        // 10. О программе
+        var aboutItem = new FormsToolStripMenuItem(loc.MenuAbout);
         aboutItem.Click += (s, e) =>
         {
-            ShowAboutDialog();
+            Dispatcher.Invoke(() => ShowAboutDialog());
         };
         contextMenu.Items.Add(aboutItem);
 
-        contextMenu.Items.Add(new Separator());
+        contextMenu.Items.Add(new FormsToolStripSeparator());
 
-        // 6. Выход
-        var exitItem = new MenuItem
-        {
-            Header = loc.MenuExit
-        };
+        // 11. Выход
+        var exitItem = new FormsToolStripMenuItem(loc.MenuExit);
         exitItem.Click += (s, e) =>
         {
-            ShutdownApp();
+            Dispatcher.Invoke(() => ShutdownApp());
         };
         contextMenu.Items.Add(exitItem);
 
-        _notifyIcon.Menu = contextMenu;
-        _notifyIcon.Register();
-
-        if (!_notifyIcon.IsRegistered && _hudWindow != null)
-        {
-            MainWindow = _hudWindow;
-            _notifyIcon.Register();
-        }
+        _notifyIcon.ContextMenuStrip = contextMenu;
     }
 
     public void ToggleFlyout()
@@ -470,7 +487,7 @@ public partial class App : Application
                         _aboutViewModel?.UpdateState(_client.CachedEndpoint, snapshot, snapshot?.UpdatedAt);
                         if (_notifyIcon != null && _viewModel != null)
                         {
-                            _notifyIcon.TooltipText = _viewModel.TrayTooltipText;
+                            _notifyIcon.Text = TruncateTooltip(_viewModel.TrayTooltipText);
                         }
                     });
                 }
@@ -630,7 +647,12 @@ public partial class App : Application
         _hotkeyManager?.Dispose();
         _tracker?.Dispose();
         _updateChecker?.Dispose();
-        _notifyIcon?.Unregister();
+        if (_notifyIcon != null)
+        {
+            _notifyIcon.Visible = false;
+            _notifyIcon.Dispose();
+            _notifyIcon = null;
+        }
         if (_flyout != null)
         {
             _flyout.IsExplicitShutdown = true;
@@ -652,7 +674,12 @@ public partial class App : Application
         _hotkeyManager?.Dispose();
         _tracker?.Dispose();
         _updateChecker?.Dispose();
-        _notifyIcon?.Unregister();
+        if (_notifyIcon != null)
+        {
+            _notifyIcon.Visible = false;
+            _notifyIcon.Dispose();
+            _notifyIcon = null;
+        }
         _hudWindow?.Close();
         _aboutWindow?.Close();
         base.OnExit(e);

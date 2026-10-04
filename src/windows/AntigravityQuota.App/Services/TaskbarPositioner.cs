@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Media;
 using AntigravityQuota.Core;
+using Point = System.Windows.Point;
 
 namespace AntigravityQuota.App.Services;
 
@@ -112,7 +113,7 @@ internal static class Win32Interop
     public static void ApplyHudWindowStyles(nint hwnd)
     {
         nint exStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
-        exStyle |= WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE;
+        exStyle |= WS_EX_TOOLWINDOW | WS_EX_TOPMOST;
         SetWindowLongPtr(hwnd, GWL_EXSTYLE, exStyle);
     }
 

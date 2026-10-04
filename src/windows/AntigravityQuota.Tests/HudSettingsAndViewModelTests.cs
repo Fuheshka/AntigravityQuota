@@ -98,6 +98,18 @@ public class HudSettingsAndViewModelTests : IDisposable
     }
 
     [Fact]
+    public void HudSettingsManager_Load_SanitizesLegacyClickThroughEnabledToFalse()
+    {
+        // Even if legacy settings file had ClickThroughEnabled = true, Load() forces it to false to prevent unclickable pass-through window
+        File.WriteAllText(_tempSettingsFile, "{\"ClickThroughEnabled\": true, \"IsEnabled\": true}");
+
+        var loaded = HudSettingsManager.Load(_tempSettingsFile);
+
+        Assert.NotNull(loaded);
+        Assert.False(loaded.ClickThroughEnabled);
+    }
+
+    [Fact]
     public void HudSettingsManager_ClampPosition_KeepsCoordinatesWithinScreenBounds()
     {
         // Monitor bounds: Left=0, Top=0, Right=1920, Bottom=1080

@@ -14,12 +14,18 @@
     ShowInTaskbar="False"
     Topmost="True"
     SizeToContent="WidthAndHeight"
+    WindowStartupLocation="Manual"
     Style="{x:Null}"
     Background="Transparent"
     Foreground="#F3F3F3"
+    MouseLeftButtonDown="OnRootMouseLeftButtonDown"
+    MouseMove="OnRootMouseMove"
+    MouseLeftButtonUp="OnRootMouseLeftButtonUp"
     d:DataContext="{d:DesignInstance vm:HudViewModel}">
 
-    <Grid x:Name="RootContainer" MouseLeftButtonDown="OnRootMouseLeftButtonDown" Background="{x:Null}">
+    <Grid
+        x:Name="RootContainer"
+        Background="Transparent">
         <Grid.ContextMenu>
             <ContextMenu>
                 <MenuItem Header="{Binding Loc.MenuCompactPillMode}" Command="{Binding TogglePillModeCommand}" />
